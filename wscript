@@ -2,7 +2,7 @@
 # encoding: utf-8
 
 APPNAME = 'slash'
-VERSION = '1.0'
+VERSION = '0.1.0'
 
 def options(ctx):
     pass
