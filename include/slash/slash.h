@@ -98,9 +98,28 @@ static inline int slash_list_head(struct slash_list *list,
 	return list == cur;
 }
 
+#ifdef __APPLE__
+extern int __slash_command_len;
+extern struct slash_command *__slash_start;
+#define slash_for_each_command(_c) \
+	int _i = 0; \
+	for (_c = __slash_start; _i < __slash_command_len; _c++, _i++)
+#define __slash_section __attribute__((section("__DATA,__slash")))
+
+#else // !__APPLE__
+
+extern struct slash_command __start_slash;
+extern struct slash_command __stop_slash;
+#define slash_for_each_command(_c) \
+	for (_c = &__stop_slash-1; \
+	     _c >= &__start_slash; \
+	     _c = (struct slash_command *)((char *)_c - command_size))
+#define __slash_section __attribute__((section("slash")))
+#endif
+
 #define __slash_command(_ident, _group, _name, _func, _args, _help) 	\
 	char _ident ## _str[] = stringify(_name);			\
-	__attribute__((section("slash")))				\
+	__slash_section							\
 	__attribute__((used))						\
 	struct slash_command _ident = {					\
 		.name  = _ident ## _str,				\

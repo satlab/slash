@@ -50,6 +50,24 @@
 #define ESCAPE(code) "\x1b[0" code
 #define ESCAPE_NUM(code) "\x1b[%u" code
 
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#include <mach-o/getsect.h>
+
+int __slash_command_len;
+struct slash_command *__slash_start;
+
+void __slash_mac_init()
+{
+	unsigned long size;
+	char *start = getsectdata("__DATA", "__slash", &size);
+	start += _dyld_get_image_vmaddr_slide(0);
+
+	__slash_command_len = size / sizeof(struct slash_command);
+	__slash_start = (struct slash_command *) start;
+}
+#endif
+
 /* Terminal handling */
 static size_t slash_escaped_strlen(const char *s)
 {
@@ -1164,9 +1182,9 @@ struct slash *slash_create(size_t line_size, size_t history_size)
 	struct slash_command *cmd;
 	unsigned long command_size;
 
-	/* Created by GCC before and after slash ELF section */
-	extern struct slash_command __start_slash;
-	extern struct slash_command __stop_slash;
+#ifdef __APPLE__
+	__slash_mac_init();
+#endif
 
 	/* Allocate slash context */
 	slash = calloc(sizeof(*slash), 1);
@@ -1202,11 +1220,6 @@ struct slash *slash_create(size_t line_size, size_t history_size)
 	slash->history_tail = slash->history;
 	slash->history_cursor = slash->history;
 	slash->history_avail = slash->history_size - 1;
-
-#define slash_for_each_command(_c) \
-	for (_c = &__stop_slash-1; \
-	     _c >= &__start_slash; \
-	     _c = (struct slash_command *)((char *)_c - command_size))
 
 	/* Register commands */
 	slash_list_init(&slash->commands);
