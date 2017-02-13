@@ -199,6 +199,13 @@ struct slash {
 	/* Command interface */
 	char **argv;
 	int argc;
+
+	/* getopt state */
+	char *optarg;
+	int optind;
+	int opterr;
+	int optopt;
+	int sp;
 };
 
 struct slash *slash_create(size_t line_size, size_t history_size);
@@ -214,5 +221,7 @@ int slash_loop(struct slash *slash, const char *prompt_good, const char *prompt_
 int slash_getchar_nonblock(struct slash *slash);
 
 int slash_printf(struct slash *slash, const char *format, ...);
+
+int slash_getopt(struct slash *slash, char *optstring);
 
 #endif /* _SLASH_H_ */

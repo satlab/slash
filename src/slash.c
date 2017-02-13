@@ -50,6 +50,57 @@
 #define ESCAPE(code) "\x1b[0" code
 #define ESCAPE_NUM(code) "\x1b[%u" code
 
+/* Command-line option parsing */
+int slash_getopt(struct slash *slash, char *opts)
+{
+	/* From "public domain AT&T getopt source" newsgroup posting */
+	int c;
+	char *cp;
+
+	if (slash->sp == 1) {
+		if (slash->optind >= slash->argc ||
+		    slash->argv[slash->optind][0] != '-' ||
+		    slash->argv[slash->optind][1] == '\0') {
+			return EOF;
+		} else if (!strcmp(slash->argv[slash->optind], "--")) {
+			slash->optind++;
+			return EOF;
+		}
+	}
+
+	slash->optopt = c = slash->argv[slash->optind][slash->sp];
+
+	if (c == ':' || (cp = strchr(opts, c)) == NULL) {
+		slash_printf(slash, "Unknown option -%c\n", c);
+		if (slash->argv[slash->optind][++(slash->sp)] == '\0') {
+			slash->optind++;
+			slash->sp = 1;
+		}
+		return '?';
+	}
+
+	if (*(++cp) == ':') {
+		if (slash->argv[slash->optind][slash->sp+1] != '\0') {
+			slash->optarg = &slash->argv[(slash->optind)++][slash->sp+1];
+		} else if(++(slash->optind) >= slash->argc) {
+			slash_printf(slash, "Option -%c requires an argument\n", c);
+			slash->sp = 1;
+			return '?';
+		} else {
+			slash->optarg = slash->argv[(slash->optind)++];
+		}
+		slash->sp = 1;
+	} else {
+		if (slash->argv[slash->optind][++(slash->sp)] == '\0') {
+			slash->sp = 1;
+			slash->optind++;
+		}
+		slash->optarg = NULL;
+	}
+
+	return c;
+}
+
 /* Terminal handling */
 static size_t slash_escaped_strlen(const char *s)
 {
@@ -467,11 +518,12 @@ int slash_execute(struct slash *slash, char *line)
 		return -EINVAL;
 	}
 
-	/* Reset state for getopt(3) */
-	optarg = 0;
-	optind = 0;
-	opterr = 1;
-	optopt = '?';
+	/* Reset state for slash_getopt */
+	slash->optarg = 0;
+	slash->optind = 1;
+	slash->opterr = 1;
+	slash->optopt = '?';
+	slash->sp = 1;
 
 	slash->argc = argc;
 	slash->argv = argv;
