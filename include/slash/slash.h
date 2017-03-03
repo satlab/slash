@@ -141,6 +141,7 @@ typedef int (*slash_func_t)(struct slash *slash);
 #define SLASH_EUSAGE	(-1)
 #define SLASH_EINVAL	(-2)
 #define SLASH_ENOSPC	(-3)
+#define SLASH_EIO	(-4)
 
 /* Command struct */
 struct slash_command {
