@@ -1176,12 +1176,14 @@ static int slash_builtin_history(struct slash *slash)
 slash_command(history, slash_builtin_history, NULL,
 	      "Show previous commands");
 
+#ifndef SLASH_NO_EXIT
 static int slash_builtin_exit(struct slash *slash)
 {
 	return SLASH_EXIT;
 }
 slash_command(exit, slash_builtin_exit, NULL,
 	      "Exit slash");
+#endif
 
 /* Core */
 int slash_loop(struct slash *slash, const char *prompt_good, const char *prompt_bad)
