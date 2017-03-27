@@ -225,4 +225,6 @@ int slash_printf(struct slash *slash, const char *format, ...);
 
 int slash_getopt(struct slash *slash, char *optstring);
 
+void slash_clear_screen(struct slash *slash);
+
 #endif /* _SLASH_H_ */

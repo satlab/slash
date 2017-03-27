@@ -949,7 +949,7 @@ static void slash_delete(struct slash *slash)
 	}
 }
 
-static void slash_clear_screen(struct slash *slash)
+void slash_clear_screen(struct slash *slash)
 {
 	char *esc = ESCAPE("H") ESCAPE("2J");
 	slash_write(slash, esc, strlen(esc));
