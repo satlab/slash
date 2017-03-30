@@ -27,7 +27,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-#ifdef HAVE_TERMIOS_H
+#ifdef SLASH_HAVE_TERMIOS_H
 #include <termios.h>
 #endif
 
@@ -135,6 +135,9 @@ static inline int slash_list_head(struct slash_list *list,
 struct slash;
 typedef int (*slash_func_t)(struct slash *slash);
 
+/* Wait function prototype */
+typedef int (*slash_waitfunc_t)(struct slash *slash, unsigned int ms);
+
 /* Command return values */
 #define SLASH_EXIT	( 1)
 #define SLASH_SUCCESS	( 0)
@@ -168,13 +171,14 @@ struct slash {
 	struct slash_list commands;
 
 	/* Terminal handling */
-#ifdef HAVE_TERMIOS_H
+#ifdef SLASH_HAVE_TERMIOS_H
 	struct termios original;
 #endif
 	bool rawmode;
 	bool atexit_registered;
 	int fd_write;
 	int fd_read;
+	slash_waitfunc_t waitfunc;
 
 	/* Line editing */
 	size_t line_size;
@@ -219,7 +223,9 @@ int slash_execute(struct slash *slash, char *line);
 
 int slash_loop(struct slash *slash, const char *prompt_good, const char *prompt_bad);
 
-int slash_getchar_nonblock(struct slash *slash);
+int slash_wait_interruptible(struct slash *slash, unsigned int ms);
+
+int slash_set_wait_interruptible(struct slash *slash, slash_waitfunc_t waitfunc);
 
 int slash_printf(struct slash *slash, const char *format, ...);
 

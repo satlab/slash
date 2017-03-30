@@ -34,8 +34,12 @@
 #include <errno.h>
 #include <fcntl.h>
 
-#ifdef HAVE_TERMIOS_H
+#ifdef SLASH_HAVE_TERMIOS_H
 #include <termios.h>
+#endif
+
+#ifdef SLASH_HAVE_SELECT
+#include <sys/select.h>
 #endif
 
 /* Configuration */
@@ -124,7 +128,7 @@ static size_t slash_escaped_strlen(const char *s)
 
 static int slash_rawmode_enable(struct slash *slash)
 {
-#ifdef HAVE_TERMIOS_H
+#ifdef SLASH_HAVE_TERMIOS_H
 	struct termios raw;
 
 	if (tcgetattr(slash->fd_read, &slash->original) < 0)
@@ -144,7 +148,7 @@ static int slash_rawmode_enable(struct slash *slash)
 
 static int slash_rawmode_disable(struct slash *slash)
 {
-#ifdef HAVE_TERMIOS_H
+#ifdef SLASH_HAVE_TERMIOS_H
 	if (tcsetattr(slash->fd_read, TCSANOW, &slash->original) < 0)
 		return -ENOTTY;
 #endif
@@ -206,20 +210,46 @@ static int slash_getchar(struct slash *slash)
 	return c;
 }
 
-int slash_getchar_nonblock(struct slash *slash)
+#ifdef SLASH_HAVE_SELECT
+static int slash_wait_select(struct slash *slash, unsigned int ms)
 {
-	unsigned char c;
+	int ret = 0;
+	char c;
+	fd_set fds;
+	struct timeval timeout;
 
-	/* Set nonblocking */
+	timeout.tv_sec = ms / 1000;
+	timeout.tv_usec = ms - timeout.tv_sec * 1000;
+
+	FD_ZERO(&fds);
+	FD_SET(slash->fd_read, &fds);
+
 	fcntl(slash->fd_read, F_SETFL, fcntl(slash->fd_read, F_GETFL) |  O_NONBLOCK);
 
-	if (slash_read(slash, &c, 1) < 1)
-		return -EIO;
+	ret = select(1, &fds, NULL, NULL, &timeout);
+	if (ret == 1) {
+		ret = -EINTR;
+		slash_read(slash, &c, 1);
+	}
 
-	/* Set back to blocking */
 	fcntl(slash->fd_read, F_SETFL, fcntl(slash->fd_read, F_GETFL) & ~O_NONBLOCK);
 
-	return c;
+	return ret;
+}
+#endif
+
+int slash_set_wait_interruptible(struct slash *slash, slash_waitfunc_t waitfunc)
+{
+	slash->waitfunc = waitfunc;
+	return 0;
+}
+
+int slash_wait_interruptible(struct slash *slash, unsigned int ms)
+{
+	if (slash->waitfunc)
+		return slash->waitfunc(slash, ms);
+
+	return -ENOSYS;
 }
 
 int slash_printf(struct slash *slash, const char *format, ...)
@@ -1000,9 +1030,6 @@ char *slash_readline(struct slash *slash, const char *prompt)
 	int c, esc[3];
 	bool done = false, escaped = false;
 
-	if (slash_configure_term(slash) < 0)
-		return NULL;
-
 	slash->prompt = prompt;
 	slash->prompt_length = strlen(prompt);
 	slash->prompt_print_length = slash_escaped_strlen(prompt);
@@ -1118,7 +1145,6 @@ char *slash_readline(struct slash *slash, const char *prompt)
 			slash_refresh(slash);
 	}
 
-	slash_restore_term(slash);
 	slash_putchar(slash, '\n');
 	slash_history_add(slash, slash->buffer);
 
@@ -1192,6 +1218,9 @@ int slash_loop(struct slash *slash, const char *prompt_good, const char *prompt_
 	char *line;
 	const char *prompt = prompt_good;
 
+	if (slash_configure_term(slash) < 0)
+		return -ENOTTY;
+
 	while ((line = slash_readline(slash, prompt))) {
 		if (!slash_line_empty(line, strlen(line))) {
 			/* Run command */
@@ -1208,6 +1237,8 @@ int slash_loop(struct slash *slash, const char *prompt_good, const char *prompt_
 			prompt = prompt_good;
 		}
 	}
+
+	slash_restore_term(slash);
 
 	return 0;
 }
@@ -1230,6 +1261,9 @@ struct slash *slash_create(size_t line_size, size_t history_size)
 	/* Setup default values */
 	slash->fd_read = STDIN_FILENO;
 	slash->fd_write = STDOUT_FILENO;
+#ifdef SLASH_HAVE_SELECT
+	slash->waitfunc = slash_wait_select;
+#endif
 
 	/* Calculate command section size */
 	command_size = labs((long)&slash_cmd_help -

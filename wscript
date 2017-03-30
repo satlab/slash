@@ -9,7 +9,7 @@ def options(ctx):
     gr.add_option('--slash-disable-exit', action='store_true', help='Disable exit command')
 
 def configure(ctx):
-    ctx.check(header_name='termios.h', features='c cprogram', mandatory=False)
+    ctx.check(header_name='termios.h', features='c cprogram', mandatory=False, define_name='SLASH_HAVE_TERMIOS_H')
     ctx.define_cond('SLASH_NO_EXIT', ctx.options.slash_disable_exit)
 
 def build(ctx):
