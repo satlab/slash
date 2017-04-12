@@ -1294,7 +1294,7 @@ struct slash *slash_create(size_t line_size, size_t history_size)
 #define slash_for_each_command(_c) \
 	for (_c = &__stop_slash-1; \
 	     _c >= &__start_slash; \
-	     _c = (struct slash_command *)((char *)_c - command_size))
+	     _c = (struct slash_command *)((unsigned long)_c - command_size))
 
 	/* Register commands */
 	slash_list_init(&slash->commands);
