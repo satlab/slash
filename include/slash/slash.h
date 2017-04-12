@@ -229,7 +229,7 @@ int slash_set_wait_interruptible(struct slash *slash, slash_waitfunc_t waitfunc)
 
 int slash_printf(struct slash *slash, const char *format, ...);
 
-int slash_getopt(struct slash *slash, char *optstring);
+int slash_getopt(struct slash *slash, const char *optstring);
 
 void slash_clear_screen(struct slash *slash);
 

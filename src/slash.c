@@ -55,7 +55,7 @@
 #define ESCAPE_NUM(code) "\x1b[%u" code
 
 /* Command-line option parsing */
-int slash_getopt(struct slash *slash, char *opts)
+int slash_getopt(struct slash *slash, const char *opts)
 {
 	/* From "public domain AT&T getopt source" newsgroup posting */
 	int c;
@@ -450,7 +450,7 @@ static int slash_build_args(char *args, char **argv, int *argc)
 	return 0;
 }
 
-static void strprepend(char *dest, char *src)
+static void strprepend(char *dest, const char *src)
 {
 	int len = strlen(src);
 	memmove(dest + len, dest, strlen(dest) + 1);
@@ -981,7 +981,7 @@ static void slash_delete(struct slash *slash)
 
 void slash_clear_screen(struct slash *slash)
 {
-	char *esc = ESCAPE("H") ESCAPE("2J");
+	const char *esc = ESCAPE("H") ESCAPE("2J");
 	slash_write(slash, esc, strlen(esc));
 }
 
