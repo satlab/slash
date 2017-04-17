@@ -1208,7 +1208,7 @@ static int slash_builtin_exit(struct slash *slash)
 	return SLASH_EXIT;
 }
 slash_command(exit, slash_builtin_exit, NULL,
-	      "Exit slash");
+	      "Exit application");
 #endif
 
 /* Core */
