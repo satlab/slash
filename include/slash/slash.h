@@ -145,6 +145,7 @@ typedef int (*slash_waitfunc_t)(struct slash *slash, unsigned int ms);
 #define SLASH_EINVAL	(-2)
 #define SLASH_ENOSPC	(-3)
 #define SLASH_EIO	(-4)
+#define SLASH_ENOMEM	(-5)
 
 /* Command struct */
 struct slash_command {
