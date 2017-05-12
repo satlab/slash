@@ -65,6 +65,11 @@ struct slash_list {
 	     &pos->member != (head);					\
 	     pos = container_of(pos->member.next, typeof(*pos), member))
 
+static inline bool slash_list_is_init(struct slash_list *list)
+{
+	return list->prev && list->next;
+}
+
 static inline void slash_list_init(struct slash_list *list)
 {
 	list->prev = list;

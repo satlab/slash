@@ -295,10 +295,18 @@ static int slash_command_register(struct slash *slash,
 				  struct slash_command *cmd,
 				  struct slash_command *super)
 {
+	bool registered = false;
 	struct slash_list *list;
 	struct slash_command *cur;
 
-	list = super ? &super->sub : &slash->commands;
+	/* Insert as subcommand or in global list */
+	if (super) {
+		list = &super->sub;
+		if (!slash_list_is_init(list))
+			slash_list_init(list);
+	} else {
+		list = &slash->commands;
+	}
 
 	slash_command_init(cmd);
 
@@ -306,13 +314,14 @@ static int slash_command_register(struct slash *slash,
 	slash_list_for_each(cur, list, command) {
 		if (slash_command_compare(cur, cmd) > 0) {
 			slash_list_insert_tail(&cur->command, &cmd->command);
+			registered = true;
 			break;
 		}
 	}
 
 	/* Insert as last member */
-	if (slash_list_head(list, &cur->command))
-		slash_list_insert_tail(list, &cmd->command);
+	if (!registered)
+		slash_list_insert_tail(list, &(cmd->command));
 
 	return 0;
 }
