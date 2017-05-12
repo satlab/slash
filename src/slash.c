@@ -482,13 +482,13 @@ static void slash_command_description(struct slash *slash, struct slash_command 
 {
 	char *nl;
 	const char *help = "";
-	int desclen = 0;
+	size_t desclen = 0;
 
 	/* Extract first line from help as description */
 	if (command->help != NULL) {
 		help = command->help;
 		nl = strchr(help, '\n');
-		desclen = nl ? nl - help : strlen(help);
+		desclen = nl ? (size_t)(nl - help) : strlen(help);
 	}
 
 	slash_printf(slash, "%-15s %.*s\n", command->name, desclen, help);
@@ -637,7 +637,7 @@ static void slash_set_completion(struct slash *slash,
 static void slash_complete(struct slash *slash)
 {
 	int matches = 0;
-	size_t completelen = 0, commandlen = 0, prefixlen = -1;
+	size_t completelen = 0, commandlen = 0, prefixlen = 0;
 	char *complete, *args;
 	struct slash_list *search = &slash->commands;
 	struct slash_command *cur, *command = NULL, *prefix = NULL;
@@ -663,7 +663,7 @@ static void slash_complete(struct slash *slash)
 		matches++;
 
 		/* Find common prefix */
-		if (prefixlen == -1) {
+		if (!prefixlen) {
 			prefix = cur;
 			prefixlen = strlen(prefix->name);
 		} else {
@@ -1151,7 +1151,8 @@ static int slash_builtin_help(struct slash *slash)
 {
 	char *args;
 	char find[slash->line_size];
-	int i, available = sizeof(find);
+	int i;
+	size_t available = sizeof(find);
 	struct slash_command *command;
 
 	/* If no arguments given, just list all top-level commands */
@@ -1200,6 +1201,7 @@ slash_command(history, slash_builtin_history, NULL,
 #ifndef SLASH_NO_EXIT
 static int slash_builtin_exit(struct slash *slash)
 {
+	(void)slash;
 	return SLASH_EXIT;
 }
 slash_command(exit, slash_builtin_exit, NULL,
