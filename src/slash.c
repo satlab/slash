@@ -155,22 +155,10 @@ static int slash_rawmode_disable(struct slash *slash)
 	return 0;
 }
 
-static void slash_atexit(void)
-{
-	// FIXME slash_rawmode_disable(slash);
-}
-
 static int slash_configure_term(struct slash *slash)
 {
 	if (slash_rawmode_enable(slash) < 0)
 		return -ENOTTY;
-
-	slash->rawmode = true;
-
-	if (!slash->atexit_registered) {
-		atexit(slash_atexit);
-		slash->atexit_registered = true;
-	}
 
 	return 0;
 }
@@ -179,8 +167,6 @@ static int slash_restore_term(struct slash *slash)
 {
 	if (slash_rawmode_disable(slash) < 0)
 		return -ENOTTY;
-
-	slash->rawmode = false;
 
 	return 0;
 }

@@ -175,8 +175,6 @@ struct slash {
 #ifdef SLASH_HAVE_TERMIOS_H
 	struct termios original;
 #endif
-	bool rawmode;
-	bool atexit_registered;
 	int fd_write;
 	int fd_read;
 	slash_waitfunc_t waitfunc;
