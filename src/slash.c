@@ -260,7 +260,7 @@ static void slash_bell(struct slash *slash)
 static bool slash_line_empty(char *line, size_t linelen)
 {
 	while (*line && linelen--)
-		if (!isspace(*line++))
+		if (!isspace((unsigned int) *line++))
 			return false;
 
 	return true;
