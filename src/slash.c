@@ -503,7 +503,7 @@ static void slash_command_help(struct slash *slash, struct slash_command *comman
 	slash_command_usage(slash, command);
 	slash_printf(slash, "%s", help);
 
-	if (help[strlen(help)-1] != '\n')
+	if (help[strlen(help)] != '\n')
 		slash_printf(slash, "\n");
 
 	if (!slash_list_empty(&command->sub)) {
