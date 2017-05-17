@@ -494,6 +494,7 @@ static void slash_command_description(struct slash *slash, struct slash_command 
 
 static void slash_command_help(struct slash *slash, struct slash_command *command)
 {
+	size_t slen;
 	const char *help = "";
 	struct slash_command *cur;
 
@@ -503,7 +504,8 @@ static void slash_command_help(struct slash *slash, struct slash_command *comman
 	slash_command_usage(slash, command);
 	slash_printf(slash, "%s", help);
 
-	if (help[strlen(help)] != '\n')
+	slen = strlen(help);
+	if (slen > 0 && help[slen - 1] != '\n')
 		slash_printf(slash, "\n");
 
 	if (!slash_list_empty(&command->sub)) {
@@ -736,7 +738,6 @@ static size_t slash_history_strlen(struct slash *slash, char *ptr)
 
 	return len;
 }
-
 
 static void slash_history_copy(struct slash *slash, char *dst, char *src, size_t len)
 {
