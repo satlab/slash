@@ -32,19 +32,11 @@
 #endif
 
 /* Helper macros */
-#ifndef offsetof
-#define offsetof(type, member) ((size_t) &((type *)0)->member)
-#endif
+#define slash_offsetof(type, member) ((size_t) &((type *)0)->member)
 
-#ifndef container_of
-#define container_of(ptr, type, member) ({			\
+#define slash_container_of(ptr, type, member) ({		\
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
 	(type *)( (void *)__mptr - offsetof(type,member) );})
-#endif
-
-#ifndef stringify
-#define stringify(_var) #_var
-#endif
 
 #define slash_max(a,b) \
 	({ __typeof__ (a) _a = (a); \
@@ -60,10 +52,10 @@ struct slash_list {
 #define SLASH_LIST_INIT(name) { &(name), &(name) }
 #define SLASH_LIST(name) struct slash_list name = SLASH_LIST_INIT(name)
 
-#define slash_list_for_each(pos, head, member)				\
-	for (pos = container_of((head)->next, typeof(*pos), member);	\
-	     &pos->member != (head);					\
-	     pos = container_of(pos->member.next, typeof(*pos), member))
+#define slash_list_for_each(pos, head, member)					\
+	for (pos = slash_container_of((head)->next, typeof(*pos), member);	\
+	     &pos->member != (head);						\
+	     pos = slash_container_of(pos->member.next, typeof(*pos), member))
 
 static inline bool slash_list_is_init(struct slash_list *list)
 {
@@ -104,7 +96,7 @@ static inline int slash_list_head(struct slash_list *list,
 }
 
 #define __slash_command(_ident, _group, _name, _func, _args, _help) 	\
-	char _ident ## _str[] = stringify(_name);			\
+	char _ident ## _str[] = #_name;					\
 	__attribute__((section("slash")))				\
 	__attribute__((used))						\
 	struct slash_command _ident = {					\
