@@ -1309,4 +1309,6 @@ void slash_destroy(struct slash *slash)
 		free(slash->history);
 		slash->history = NULL;
 	}
+
+	free(slash);
 }
