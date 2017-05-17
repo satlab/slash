@@ -293,20 +293,18 @@ static int slash_command_init(struct slash_command *cmd)
 
 static int slash_command_register(struct slash *slash,
 				  struct slash_command *cmd,
-				  struct slash_command *super)
+				  struct slash_command *parent)
 {
 	bool registered = false;
 	struct slash_list *list;
 	struct slash_command *cur;
 
 	/* Insert as subcommand or in global list */
-	if (super) {
-		list = &super->sub;
-		if (!slash_list_is_init(list))
-			slash_list_init(list);
-	} else {
-		list = &slash->commands;
-	}
+	list = parent ? &parent->sub : &slash->commands;
+
+	/* Ensure list is initialized */
+	if (!slash_list_is_init(list))
+		slash_list_init(list);
 
 	slash_command_init(cmd);
 
@@ -321,7 +319,7 @@ static int slash_command_register(struct slash *slash,
 
 	/* Insert as last member */
 	if (!registered)
-		slash_list_insert_tail(list, &(cmd->command));
+		slash_list_insert_tail(list, &cmd->command);
 
 	return 0;
 }
@@ -459,7 +457,7 @@ static void slash_command_fullname(struct slash_command *command, char *name)
 	while (command != NULL) {
 		/* Prepend command name to full name */
 		strprepend(name, command->name);
-		command = command->group;
+		command = command->parent;
 		if (command)
 			strprepend(name, " ");
 	};
@@ -1296,7 +1294,7 @@ struct slash *slash_create(size_t line_size, size_t history_size)
 	/* Register commands */
 	slash_list_init(&slash->commands);
 	slash_for_each_command(cmd)
-		slash_command_register(slash, cmd, cmd->group);
+		slash_command_register(slash, cmd, cmd->parent);
 
 	return slash;
 }

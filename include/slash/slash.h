@@ -109,7 +109,7 @@ static inline int slash_list_head(struct slash_list *list,
 	__attribute__((used))						\
 	struct slash_command _ident = {					\
 		.name  = _ident ## _str,				\
-		.group = _group,					\
+		.parent = _group,					\
 		.func  = _func,						\
 		.args  = _args,						\
 		.help  = _help,						\
@@ -161,7 +161,7 @@ struct slash_command {
 	const char *help;
 
 	/* Parent command */
-	struct slash_command *group;
+	struct slash_command *parent;
 
 	/* Subcommand list */
 	struct slash_list sub;
