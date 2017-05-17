@@ -1249,7 +1249,7 @@ struct slash *slash_create(size_t line_size, size_t history_size)
 	extern struct slash_command __stop_slash;
 
 	/* Allocate slash context */
-	slash = calloc(sizeof(*slash), 1);
+	slash = calloc(1, sizeof(*slash));
 	if (!slash)
 		return NULL;
 
@@ -1266,14 +1266,14 @@ struct slash *slash_create(size_t line_size, size_t history_size)
 
 	/* Allocate zero-initialized line and history buffers */
 	slash->line_size = line_size;
-	slash->buffer = calloc(slash->line_size, 1);
+	slash->buffer = calloc(1, slash->line_size);
 	if (!slash->buffer) {
 		free(slash);
 		return NULL;
 	}
 
 	slash->history_size = history_size;
-	slash->history = calloc(slash->history_size, 1);
+	slash->history = calloc(1, slash->history_size);
 	if (!slash->history) {
 		free(slash->buffer);
 		free(slash);
