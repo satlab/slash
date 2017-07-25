@@ -669,6 +669,10 @@ static void slash_complete(struct slash *slash)
 		} else {
 			prefixlen = slash_prefix_length(prefix->name, cur->name);
 		}
+
+		/* If no complete string, disable prefix */
+		if (!completelen)
+			prefixlen = 0;
 	}
 
 	/* Complete or list matches */
