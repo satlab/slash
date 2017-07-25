@@ -29,6 +29,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <ctype.h>
 #include <errno.h>
@@ -637,7 +638,7 @@ static void slash_set_completion(struct slash *slash,
 static void slash_complete(struct slash *slash)
 {
 	int matches = 0;
-	size_t completelen = 0, commandlen = 0, prefixlen = 0;
+	size_t completelen = 0, commandlen = 0, prefixlen = SIZE_MAX;
 	char *complete, *args;
 	struct slash_list *search = &slash->commands;
 	struct slash_command *cur, *command = NULL, *prefix = NULL;
@@ -663,16 +664,12 @@ static void slash_complete(struct slash *slash)
 		matches++;
 
 		/* Find common prefix */
-		if (!prefixlen) {
+		if (prefixlen == SIZE_MAX) {
 			prefix = cur;
 			prefixlen = strlen(prefix->name);
 		} else {
 			prefixlen = slash_prefix_length(prefix->name, cur->name);
 		}
-
-		/* If no complete string, disable prefix */
-		if (!completelen)
-			prefixlen = 0;
 	}
 
 	/* Complete or list matches */
