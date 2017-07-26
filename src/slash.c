@@ -1208,15 +1208,27 @@ slash_command(exit, slash_builtin_exit, NULL,
 	      "Exit application");
 #endif
 
+void slash_require_activation(struct slash *slash, bool activate)
+{
+	slash->use_activate = activate;
+}
+
 /* Core */
 int slash_loop(struct slash *slash, const char *prompt_good, const char *prompt_bad)
 {
-	int ret;
+	int c, ret;
 	char *line;
 	const char *prompt = prompt_good;
 
 	if (slash_configure_term(slash) < 0)
 		return -ENOTTY;
+
+	if (slash->use_activate) {
+		slash_printf(slash, "Press enter to activate this console ");
+		do {
+			c = slash_getchar(slash);
+		} while (c != '\n' && c != '\r');
+	}
 
 	while ((line = slash_readline(slash, prompt))) {
 		if (!slash_line_empty(line, strlen(line))) {

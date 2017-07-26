@@ -175,6 +175,7 @@ struct slash {
 	int fd_write;
 	int fd_read;
 	slash_waitfunc_t waitfunc;
+	bool use_activate;
 
 	/* Line editing */
 	size_t line_size;
@@ -228,5 +229,7 @@ int slash_printf(struct slash *slash, const char *format, ...);
 int slash_getopt(struct slash *slash, const char *optstring);
 
 void slash_clear_screen(struct slash *slash);
+
+void slash_require_activation(struct slash *slash, bool activate);
 
 #endif /* _SLASH_H_ */
