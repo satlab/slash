@@ -911,8 +911,7 @@ static int slash_refresh(struct slash *slash)
 	slash->buffer[slash->length] = '\0';
 
 	/* Move cursor to left edge */
-	snprintf(esc, sizeof(esc), "\r");
-	if (slash_write(slash, esc, strlen(esc)) < 0)
+	if (slash_putchar(slash, '\r') < 0)
 		return -1;
 
 	/* Write the prompt and the current buffer content */
@@ -921,13 +920,8 @@ static int slash_refresh(struct slash *slash)
 	if (slash_write(slash, slash->buffer, slash->length) < 0)
 		return -1;
 
-	/* Erase to right */
-	snprintf(esc, sizeof(esc), ESCAPE("K"));
-	if (slash_write(slash, esc, strlen(esc)) < 0)
-		return -1;
-
-	/* Move cursor to original position. */
-	snprintf(esc, sizeof(esc), "\r" ESCAPE_NUM("C"),
+	/* Erase to the right and move cursor to original position. */
+	snprintf(esc, sizeof(esc), ESCAPE("K") "\r" ESCAPE_NUM("C"),
 		(unsigned int)(slash->cursor + slash->prompt_print_length));
 	if (slash_write(slash, esc, strlen(esc)) < 0)
 		return -1;
