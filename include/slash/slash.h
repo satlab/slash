@@ -188,6 +188,7 @@ struct slash {
 	size_t length;
 	bool escaped;
 	char last_char;
+	size_t last_cursor;
 
 	/* History */
 	size_t history_size;

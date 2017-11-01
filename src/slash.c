@@ -52,8 +52,7 @@
 #define DEL '\x7f'
 
 #define CONTROL(code) (code - '@')
-#define ESCAPE(code) "\x1b[0" code
-#define ESCAPE_NUM(code) "\x1b[%u" code
+#define ESCAPE(code) "\x1b[" code
 
 /* Command-line option parsing */
 int slash_getopt(struct slash *slash, const char *opts)
@@ -907,6 +906,17 @@ static int slash_refresh(struct slash *slash)
 {
 	char esc[16];
 
+	/* Fast path if we're adding a character to the end of the line */
+	if (slash->cursor == slash->length &&
+	    slash->cursor == slash->last_cursor + 1) {
+		slash_putchar(slash, slash->buffer[slash->cursor - 1]);
+		slash->last_cursor = slash->cursor;
+		return 0;
+	}
+
+	/* Update last cursor refresh position */
+	slash->last_cursor = slash->cursor;
+
 	/* Ensure line is zero terminated */
 	slash->buffer[slash->length] = '\0';
 
@@ -921,7 +931,7 @@ static int slash_refresh(struct slash *slash)
 		return -1;
 
 	/* Erase to the right and move cursor to original position. */
-	snprintf(esc, sizeof(esc), ESCAPE("K") "\r" ESCAPE_NUM("C"),
+	snprintf(esc, sizeof(esc), ESCAPE("K") "\r" ESCAPE("%uC"),
 		(unsigned int)(slash->cursor + slash->prompt_print_length));
 	if (slash_write(slash, esc, strlen(esc)) < 0)
 		return -1;
@@ -934,6 +944,7 @@ static void slash_reset(struct slash *slash)
 	slash->buffer[0] = '\0';
 	slash->length = 0;
 	slash->cursor = 0;
+	slash->last_cursor = 0;
 }
 
 static void slash_arrow_up(struct slash *slash)
