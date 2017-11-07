@@ -205,7 +205,7 @@ static int slash_wait_select(struct slash *slash, unsigned int ms)
 	struct timeval timeout;
 
 	timeout.tv_sec = ms / 1000;
-	timeout.tv_usec = ms - timeout.tv_sec * 1000;
+	timeout.tv_usec = (ms - timeout.tv_sec * 1000) * 1000;
 
 	FD_ZERO(&fds);
 	FD_SET(slash->fd_read, &fds);
