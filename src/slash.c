@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2014-2016 Satlab ApS <satlab@satlab.com>
+ * Copyright (c) 2014-2018 Satlab ApS <satlab@satlab.com>
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -276,17 +276,8 @@ static int slash_command_compare(struct slash_command *c1,
 
 static int slash_command_init(struct slash_command *cmd)
 {
-	char *p = cmd->name;
-
 	/* Initialize subcommand list */
 	slash_list_init(&cmd->sub);
-
-	/* Replace underscore with dash */
-	while (*p) {
-		if (*p == '_')
-			*p = '-';
-		p++;
-	}
 
 	return 0;
 }
@@ -610,7 +601,7 @@ static bool slash_complete_confirm(struct slash *slash, int matches)
 	return (c == 'y' || c == '\t');
 }
 
-static int slash_prefix_length(char *s1, char *s2)
+static int slash_prefix_length(const char *s1, const char *s2)
 {
 	int len = 0;
 
@@ -624,7 +615,7 @@ static int slash_prefix_length(char *s1, char *s2)
 }
 
 static void slash_set_completion(struct slash *slash,
-				 char *complete, char *match,
+				 char *complete, const char *match,
 				 int len, bool space)
 {
 	strncpy(complete, match, len);

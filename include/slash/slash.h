@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2014-2016 Satlab ApS <satlab@satlab.com>
+ * Copyright (c) 2014-2018 Satlab ApS <satlab@satlab.com>
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -68,14 +68,6 @@ static inline void slash_list_init(struct slash_list *list)
 	list->next = list;
 }
 
-static inline void slash_list_insert(struct slash_list *list, struct slash_list *elm)
-{
-	elm->prev = list;
-	elm->next = list->next;
-	list->next = elm;
-	elm->next->prev = elm;
-}
-
 static inline void slash_list_insert_tail(struct slash_list *list, struct slash_list *elm)
 {
 	elm->next = list;
@@ -96,11 +88,10 @@ static inline int slash_list_head(struct slash_list *list,
 }
 
 #define __slash_command(_ident, _group, _name, _func, _args, _help) 	\
-	char _ident ## _str[] = #_name;					\
 	__attribute__((section("slash")))				\
 	__attribute__((used))						\
 	struct slash_command _ident = {					\
-		.name  = _ident ## _str,				\
+		.name  = #_name,					\
 		.parent = _group,					\
 		.func  = _func,						\
 		.args  = _args,						\
@@ -148,7 +139,7 @@ typedef int (*slash_waitfunc_t)(struct slash *slash, unsigned int ms);
 /* Command struct */
 struct slash_command {
 	/* Static data */
-	char *name;
+	const char *name;
 	const slash_func_t func;
 	const char *args;
 	const char *help;
