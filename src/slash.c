@@ -282,6 +282,23 @@ static int slash_command_init(struct slash_command *cmd)
 	return 0;
 }
 
+void slash_set_privileged(struct slash *slash, bool privileged)
+{
+	slash->privileged = privileged;
+}
+
+static bool slash_command_is_hidden(const struct slash *slash,
+				    const struct slash_command *cmd)
+{
+	if (cmd->flags & SLASH_FLAG_HIDDEN)
+		return true;
+
+	if (!slash->privileged && (cmd->flags & SLASH_FLAG_PRIVILEGED))
+		return true;
+
+	return false;
+}
+
 static int slash_command_register(struct slash *slash,
 				  struct slash_command *cmd,
 				  struct slash_command *parent)
@@ -289,6 +306,10 @@ static int slash_command_register(struct slash *slash,
 	bool registered = false;
 	struct slash_list *list;
 	struct slash_command *cur;
+
+	/* Make command hidden if parent is hidden */
+	if (parent && slash_command_is_hidden(slash, parent))
+		cmd->flags |= parent->flags;
 
 	/* Insert as subcommand or in global list */
 	list = parent ? &parent->sub : &slash->commands;
@@ -541,8 +562,12 @@ int slash_execute(struct slash *slash, char *line)
 	slash->optopt = '?';
 	slash->sp = 1;
 
+	/* Set command context */
+	slash->context = command->context;
+
 	slash->argc = argc;
 	slash->argv = argv;
+
 	ret = command->func(slash);
 
 	if (ret == SLASH_EUSAGE)
@@ -641,12 +666,18 @@ static void slash_complete(struct slash *slash)
 	/* Determine if we are completing sub command */
 	if (!slash_line_empty(slash->buffer, commandlen)) {
 		command = slash_command_find(slash, slash->buffer, commandlen, &args);
-		if (command)
+		if (command && !slash_command_is_hidden(slash, command)) {
 			search = &command->sub;
+		} else {
+			return;
+		}
 	}
 
 	/* Search list for matches */
 	slash_list_for_each(cur, search, command) {
+		if (slash_command_is_hidden(slash, cur))
+			continue;
+
 		if (strncmp(cur->name, complete, completelen) != 0)
 			continue;
 
@@ -1154,8 +1185,11 @@ static int slash_builtin_help(struct slash *slash)
 	/* If no arguments given, just list all top-level commands */
 	if (slash->argc < 2) {
 		slash_printf(slash, "Available commands:\n");
-		slash_list_for_each(command, &slash->commands, command)
+		slash_list_for_each(command, &slash->commands, command) {
+			if (slash_command_is_hidden(slash, command))
+				continue;
 			slash_command_description(slash, command);
+		}
 		return SLASH_SUCCESS;
 	}
 

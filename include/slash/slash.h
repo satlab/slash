@@ -87,7 +87,11 @@ static inline int slash_list_head(struct slash_list *list,
 	return list == cur;
 }
 
-#define __slash_command(_ident, _group, _name, _func, _args, _help) 	\
+/* Command flags */
+#define SLASH_FLAG_HIDDEN	(1 << 0) /* Hidden and not shown in help or completion */
+#define SLASH_FLAG_PRIVILEGED	(1 << 1) /* Privileged and hidden until enabled with slash_set_privileged() */
+
+#define __slash_command(_ident, _group, _name, _func, _args, _help, _flags, _context) \
 	__attribute__((section("slash")))				\
 	__attribute__((used))						\
 	struct slash_command _ident = {					\
@@ -96,27 +100,49 @@ static inline int slash_list_head(struct slash_list *list,
 		.func  = _func,						\
 		.args  = _args,						\
 		.help  = _help,						\
+		.flags = _flags,					\
+		.context = _context,					\
 	};
 
-#define slash_command(_name, _func, _args, _help)			\
+/* Top-level commands */
+#define slash_command_ex(_name, _func, _args, _help, _flags, _context)	\
 	__slash_command(slash_cmd_ ## _name,				\
 			NULL, 						\
-			_name, _func, _args, _help)
+			_name, _func, _args, _help, _flags, _context)
 
-#define slash_command_sub(_group, _name, _func, _args, _help)		\
+#define slash_command(_name, _func, _args, _help) \
+	slash_command_ex(_name, _func, _args, _help, 0, NULL)
+
+/* Subcommand */
+#define slash_command_sub_ex(_group, _name, _func, _args, _help, _flags, _context) \
 	__slash_command(slash_cmd_ ## _group ## _ ## _name,		\
 			&(slash_cmd_ ## _group),			\
-			_name, _func, _args, _help)
+			_name, _func, _args, _help, _flags, _context)
+
+#define slash_command_sub(_group, _name, _func, _args, _help) 		\
+	slash_command_sub_ex(_group, _name, _func, _args, _help, 0, NULL)
+
+/* Subsubcommand */
+#define slash_command_subsub_ex(_group, _subgroup, _name, _func, _args, _help, _flags, _context) \
+	__slash_command(slash_cmd_ ## _group ## _ ## _subgroup ## _name,\
+			&(slash_cmd_ ## _group ## _ ## _subgroup),	\
+			_name, _func, _args, _help, _flags, _context)
 
 #define slash_command_subsub(_group, _subgroup, _name, _func, _args, _help) \
-	__slash_command(slash_cmd_ ## _group ## _ ## _subgroup ## _name, \
-			&(slash_cmd_ ## _group ## _ ## _subgroup), 	\
-			_name, _func, _args, _help)
+	slash_command_subsub_ex(_group, _subgroup, _name, _func, _args, _help, 0, NULL)
 
-#define slash_command_group(_name, _help)				\
-	slash_command(_name, NULL, NULL, _help)
+/* Top-level group */
+#define slash_command_group_ex(_name, _help, _flags) \
+	slash_command_ex(_name, NULL, NULL, _help, _flags, NULL)
 
-#define slash_command_subgroup(_group, _name, _help)			\
+#define slash_command_group(_name, _help) \
+	slash_command_group_ex(_name, _help, 0)
+
+/* Subgroup */
+#define slash_command_subgroup_ex(_group, _name, _help, _flags) \
+	slash_command_sub_ex(_group, _name, NULL, NULL, _help, _flags, NULL)
+
+#define slash_command_subgroup(_group, _name, _help) \
 	slash_command_sub(_group, _name, NULL, NULL, _help)
 
 /* Command prototype */
@@ -144,6 +170,12 @@ struct slash_command {
 	const char *args;
 	const char *help;
 
+	/* Flags */
+	unsigned int flags;
+
+	/* Command context */
+	void *context;
+
 	/* Parent command */
 	struct slash_command *parent;
 
@@ -168,6 +200,7 @@ struct slash {
 	int fd_read;
 	slash_waitfunc_t waitfunc;
 	bool use_activate;
+	bool privileged;
 
 	/* Line editing */
 	size_t line_size;
@@ -194,6 +227,7 @@ struct slash {
 	/* Command interface */
 	char **argv;
 	int argc;
+	void *context;
 
 	/* getopt state */
 	char *optarg;
@@ -224,5 +258,7 @@ int slash_getopt(struct slash *slash, const char *optstring);
 void slash_clear_screen(struct slash *slash);
 
 void slash_require_activation(struct slash *slash, bool activate);
+
+void slash_set_privileged(struct slash *slash, bool privileged);
 
 #endif /* _SLASH_H_ */
