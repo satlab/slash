@@ -1106,7 +1106,9 @@ char *slash_readline(struct slash *slash, const char *prompt)
 				if (slash->length > 0) {
 					slash_delete(slash);
 				} else {
+#ifndef SLASH_NO_EXIT
 					ret = NULL;
+#endif
 					done = true;
 				}
 				break;
