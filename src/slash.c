@@ -199,7 +199,7 @@ static int slash_getchar(struct slash *slash)
 #ifdef SLASH_HAVE_SELECT
 static int slash_wait_select(struct slash *slash, unsigned int ms)
 {
-	int ret = 0;
+	int ret = -ETIMEDOUT;
 	char c;
 	fd_set fds;
 	struct timeval timeout;
@@ -214,8 +214,8 @@ static int slash_wait_select(struct slash *slash, unsigned int ms)
 
 	ret = select(1, &fds, NULL, NULL, &timeout);
 	if (ret == 1) {
-		ret = -EINTR;
 		slash_read(slash, &c, 1);
+		ret = (unsigned char)c;
 	}
 
 	fcntl(slash->fd_read, F_SETFL, fcntl(slash->fd_read, F_GETFL) & ~O_NONBLOCK);
