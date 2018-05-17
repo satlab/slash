@@ -455,37 +455,23 @@ static int slash_build_args(char *args, char **argv, int *argc)
 	return 0;
 }
 
-static void strprepend(char *dest, const char *src)
+static void slash_command_name_recurse(struct slash *slash, struct slash_command *command)
 {
-	int len = strlen(src);
-	memmove(dest + len, dest, strlen(dest) + 1);
-	memcpy(dest, src, len);
-}
-
-static void slash_command_fullname(struct slash_command *command, char *name)
-{
-	name[0] = '\0';
-
-	while (command != NULL) {
-		/* Prepend command name to full name */
-		strprepend(name, command->name);
-		command = command->parent;
-		if (command)
-			strprepend(name, " ");
-	};
+	if (command->parent) {
+		slash_command_name_recurse(slash, command->parent);
+		slash_printf(slash, " ");
+	}
+	slash_printf(slash, "%s", command->name);
 }
 
 static void slash_command_usage(struct slash *slash, struct slash_command *command)
 {
-	char fullname[slash->line_size];
 	const char *args = command->args ? command->args : "";
 	const char *type = command->func ? "usage" : "group";
 
-	fullname[0] = '\0';
-
-	slash_command_fullname(command, fullname);
-
-	slash_printf(slash, "%s: %s %s\n", type, fullname, args);
+	slash_printf(slash, "%s: ", type);
+	slash_command_name_recurse(slash, command);
+	slash_printf(slash, " %s\n", args);
 }
 
 static void slash_command_description(struct slash *slash, struct slash_command *command)
