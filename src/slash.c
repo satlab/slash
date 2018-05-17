@@ -897,33 +897,9 @@ static void slash_history_previous(struct slash *slash)
 }
 
 /* Line editing */
-static void slash_insert(struct slash *slash, int c)
-{
-	if (slash->length + 1 < slash->line_size) {
-		memmove(&slash->buffer[slash->cursor + 1],
-			&slash->buffer[slash->cursor],
-			slash->length - slash->cursor);
-		slash->buffer[slash->cursor] = c;
-		slash->cursor++;
-		slash->length++;
-		slash->buffer[slash->length] = '\0';
-	}
-}
-
 static int slash_refresh(struct slash *slash)
 {
 	char esc[16];
-
-	/* Fast path if we're adding a character to the end of the line */
-	if (slash->cursor == slash->length &&
-	    slash->cursor == slash->last_cursor + 1) {
-		slash_putchar(slash, slash->buffer[slash->cursor - 1]);
-		slash->last_cursor = slash->cursor;
-		return 0;
-	}
-
-	/* Update last cursor refresh position */
-	slash->last_cursor = slash->cursor;
 
 	/* Ensure line is zero terminated */
 	slash->buffer[slash->length] = '\0';
@@ -947,12 +923,35 @@ static int slash_refresh(struct slash *slash)
 	return 0;
 }
 
+static void slash_insert(struct slash *slash, int c)
+{
+	if (slash->length + 1 > slash->line_size)
+		return;
+
+	/* Fast path if we're adding a character to the end of the line */
+	if (slash->cursor == slash->length) {
+		slash->buffer[slash->cursor] = c;
+		slash->cursor++;
+		slash->length++;
+		slash->buffer[slash->length] = '\0';
+		slash_putchar(slash, slash->buffer[slash->cursor - 1]);
+	} else {
+		memmove(&slash->buffer[slash->cursor + 1],
+			&slash->buffer[slash->cursor],
+			slash->length - slash->cursor);
+		slash->buffer[slash->cursor] = c;
+		slash->cursor++;
+		slash->length++;
+		slash->buffer[slash->length] = '\0';
+		slash_refresh(slash);
+	}
+}
+
 static void slash_reset(struct slash *slash)
 {
 	slash->buffer[0] = '\0';
 	slash->length = 0;
 	slash->cursor = 0;
-	slash->last_cursor = 0;
 }
 
 static void slash_arrow_up(struct slash *slash)
@@ -1076,6 +1075,8 @@ char *slash_readline(struct slash *slash, const char *prompt)
 					slash->cursor = slash->length;
 			}
 			escaped = false;
+
+			slash_refresh(slash);
 		} else if (iscntrl(c)) {
 			switch (c) {
 			case CONTROL('A'):
@@ -1144,15 +1145,14 @@ char *slash_readline(struct slash *slash, const char *prompt)
 				/* Unknown control */
 				break;
 			}
+
+			slash_refresh(slash);
 		} else if (isprint(c)) {
 			/* Add to buffer */
 			slash_insert(slash, c);
 		}
 
 		slash->last_char = c;
-
-		if (!done)
-			slash_refresh(slash);
 	}
 
 	slash_putchar(slash, '\n');
