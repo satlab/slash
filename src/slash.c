@@ -393,6 +393,10 @@ slash_command_find(struct slash *slash, char *line, size_t linelen, char **args)
 		start = &command->sub;
 	}
 
+	/* Completely hide privileged commands in non-privileged mode */
+	if (!slash->privileged && (command->flags & SLASH_FLAG_PRIVILEGED))
+		return NULL;
+
 	return command;
 }
 
