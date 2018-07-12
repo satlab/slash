@@ -379,12 +379,20 @@ slash_command_find(struct slash *slash, char *line, size_t linelen, char **args)
 		found = false;
 
 		slash_list_for_each(cur, start, command) {
+			/* Skip if name does not match */
 			matchlen = slash_max(tokenlen, strlen(cur->name));
-			if (!strncmp(token, cur->name, matchlen)) {
-				command = cur;
-				*args = token;
-				found = true;
-			}
+			if (strncmp(token, cur->name, matchlen) != 0)
+				continue;
+
+			/* Skip if privileged command in non-privileged mode */
+			if (!slash->privileged &&
+			    (cur->flags & SLASH_FLAG_PRIVILEGED))
+				continue;
+
+			/* We found our command */
+			command = cur;
+			*args = token;
+			found = true;
 		}
 
 		if (!found)
@@ -392,10 +400,6 @@ slash_command_find(struct slash *slash, char *line, size_t linelen, char **args)
 
 		start = &command->sub;
 	}
-
-	/* Completely hide privileged commands in non-privileged mode */
-	if (!slash->privileged && (command->flags & SLASH_FLAG_PRIVILEGED))
-		return NULL;
 
 	return command;
 }
