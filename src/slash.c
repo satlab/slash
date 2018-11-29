@@ -128,6 +128,9 @@ static size_t slash_escaped_strlen(const char *s)
 
 static int slash_rawmode_enable(struct slash *slash)
 {
+	if (!isatty(slash->fd_read))
+		return 0;
+
 #ifdef SLASH_HAVE_TERMIOS_H
 	struct termios raw;
 
@@ -148,6 +151,9 @@ static int slash_rawmode_enable(struct slash *slash)
 
 static int slash_rawmode_disable(struct slash *slash)
 {
+	if (!isatty(slash->fd_read))
+		return 0;
+
 #ifdef SLASH_HAVE_TERMIOS_H
 	if (tcsetattr(slash->fd_read, TCSANOW, &slash->original) < 0)
 		return -ENOTTY;
