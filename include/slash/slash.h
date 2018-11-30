@@ -240,6 +240,10 @@ struct slash *slash_create(size_t line_size, size_t history_size);
 
 void slash_destroy(struct slash *slash);
 
+int slash_refresh(struct slash *slash);
+
+void slash_reset(struct slash *slash);
+
 char *slash_readline(struct slash *slash, const char *prompt);
 
 int slash_execute(struct slash *slash, char *line);

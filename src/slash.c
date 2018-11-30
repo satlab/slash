@@ -911,7 +911,7 @@ static void slash_history_previous(struct slash *slash)
 }
 
 /* Line editing */
-static int slash_refresh(struct slash *slash)
+int slash_refresh(struct slash *slash)
 {
 	char esc[16];
 
@@ -961,7 +961,7 @@ static void slash_insert(struct slash *slash, int c)
 	}
 }
 
-static void slash_reset(struct slash *slash)
+void slash_reset(struct slash *slash)
 {
 	slash->buffer[0] = '\0';
 	slash->length = 0;
