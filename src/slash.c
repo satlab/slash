@@ -514,7 +514,7 @@ static void slash_command_help(struct slash *slash, struct slash_command *comman
 		help = command->help;
 
 	slash_command_usage(slash, command);
-	slash_printf(slash, "%s", help);
+	slash_printf(slash, "\n%s", help);
 
 	slen = strlen(help);
 	if (slen > 0 && help[slen - 1] != '\n')
