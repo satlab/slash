@@ -201,6 +201,7 @@ struct slash {
 	slash_waitfunc_t waitfunc;
 	bool use_activate;
 	bool privileged;
+	bool exit_inhibit;
 
 	/* Line editing */
 	size_t line_size;
@@ -261,6 +262,8 @@ int slash_getopt(struct slash *slash, const char *optstring);
 void slash_clear_screen(struct slash *slash);
 
 void slash_require_activation(struct slash *slash, bool activate);
+
+void slash_inhibit_exit(struct slash *slash, bool inhibit);
 
 void slash_set_privileged(struct slash *slash, bool privileged);
 

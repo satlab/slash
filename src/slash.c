@@ -1108,7 +1108,8 @@ char *slash_readline(struct slash *slash, const char *prompt)
 					slash_delete(slash);
 				} else {
 #ifndef SLASH_NO_EXIT
-					ret = NULL;
+					if (!slash->exit_inhibit)
+						ret = NULL;
 #endif
 					done = true;
 				}
@@ -1233,7 +1234,11 @@ slash_command(history, slash_builtin_history, NULL,
 #ifndef SLASH_NO_EXIT
 static int slash_builtin_exit(struct slash *slash)
 {
-	(void)slash;
+	if (slash->exit_inhibit) {
+		slash_printf(slash, "Exit has been disabled in this console\n");
+		return 0;
+	}
+
 	return SLASH_EXIT;
 }
 slash_command(exit, slash_builtin_exit, NULL,
@@ -1243,6 +1248,11 @@ slash_command(exit, slash_builtin_exit, NULL,
 void slash_require_activation(struct slash *slash, bool activate)
 {
 	slash->use_activate = activate;
+}
+
+void slash_inhibit_exit(struct slash *slash, bool inhibit)
+{
+	slash->exit_inhibit = inhibit;
 }
 
 /* Core */
