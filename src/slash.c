@@ -572,6 +572,8 @@ int slash_execute(struct slash *slash, char *line)
 
 	if (ret == SLASH_EUSAGE)
 		slash_command_usage(slash, command);
+	else if (ret == SLASH_EHELP)
+		slash_command_help(slash, command);
 
 	return ret;
 }
