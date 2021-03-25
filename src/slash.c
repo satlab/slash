@@ -280,14 +280,6 @@ static int slash_command_compare(struct slash_command *c1,
 	return strcmp(c1->name, c2->name);
 }
 
-static int slash_command_init(struct slash_command *cmd)
-{
-	/* Initialize subcommand list */
-	slash_list_init(&cmd->sub);
-
-	return 0;
-}
-
 void slash_set_privileged(struct slash *slash, bool privileged)
 {
 	slash->privileged = privileged;
@@ -313,18 +305,25 @@ static int slash_command_register(struct slash *slash,
 	struct slash_list *list;
 	struct slash_command *cur;
 
-	/* Make command hidden if parent is hidden */
-	if (parent && slash_command_is_hidden(slash, parent))
+	/* Select parent command list */
+	if (parent) {
+		/* Make command hidden if parent is hidden */
 		cmd->flags |= parent->flags;
 
-	/* Insert as subcommand or in global list */
-	list = parent ? &parent->sub : &slash->commands;
+		/* Insert in parent subcommand */
+		list = &parent->sub;
 
-	/* Ensure list is initialized */
-	if (!slash_list_is_init(list))
-		slash_list_init(list);
+		/* Ensure parent command list is initialized */
+		if (!slash_list_is_init(list))
+			slash_list_init(list);
+	} else {
+		/* Insert in top command list */
+		list = &slash->commands;
+	}
 
-	slash_command_init(cmd);
+	/* Ensure own subcommand list is initialized */
+	if (!slash_list_is_init(&cmd->sub))
+		slash_list_init(&cmd->sub);
 
 	/* Insert sorted by name */
 	slash_list_for_each(cur, list, command) {
@@ -1318,10 +1317,6 @@ struct slash *slash_create(size_t line_size, size_t history_size)
 	slash->waitfunc = slash_wait_select;
 #endif
 
-	/* Calculate command section size */
-	command_size = labs((long)&slash_cmd_help -
-			    (long)&slash_cmd_history);
-
 	/* Allocate zero-initialized line and history buffers */
 	slash->line_size = line_size;
 	slash->buffer = calloc(1, slash->line_size);
@@ -1344,15 +1339,17 @@ struct slash *slash_create(size_t line_size, size_t history_size)
 	slash->history_cursor = slash->history;
 	slash->history_avail = slash->history_size - 1;
 
-#define slash_for_each_command(_c) \
-	for (_c = &__stop_slash-1; \
-	     _c >= &__start_slash; \
-	     _c = (struct slash_command *)((unsigned long)_c - command_size))
+	/* Calculate command section size */
+	command_size = labs((long)&slash_cmd_help -
+			    (long)&slash_cmd_history);
 
 	/* Register commands */
 	slash_list_init(&slash->commands);
-	slash_for_each_command(cmd)
+	for (cmd = &__start_slash;
+	     cmd < &__stop_slash;
+	     cmd = (struct slash_command *)((unsigned long)cmd + command_size)) {
 		slash_command_register(slash, cmd, cmd->parent);
+	}
 
 	return slash;
 }
