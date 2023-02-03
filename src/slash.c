@@ -1232,6 +1232,20 @@ static int slash_builtin_history(struct slash *slash)
 slash_command(history, slash_builtin_history, NULL,
 	      "Show previous commands");
 
+static int slash_builtin_echo(struct slash *slash)
+{
+	int i;
+
+	for (i = 1; i < slash->argc; i++)
+		printf("%s ", slash->argv[i]);
+
+	printf("\n");
+
+	return SLASH_SUCCESS;
+}
+slash_command(echo, slash_builtin_echo, "[string]",
+	      "Display a line of text");
+
 #ifndef SLASH_NO_EXIT
 static int slash_builtin_exit(struct slash *slash)
 {
