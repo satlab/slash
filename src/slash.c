@@ -272,6 +272,18 @@ static bool slash_line_empty(char *line, size_t linelen)
 	return true;
 }
 
+static bool slash_line_empty_or_comment(char *line, size_t linelen)
+{
+	while (*line && linelen--) {
+		if (*line == '#')
+			return true;
+		if (!isspace((unsigned int) *line++))
+			return false;
+	}
+
+	return true;
+}
+
 /* Command handling */
 static int slash_command_compare(struct slash_command *c1,
 				 struct slash_command *c2)
@@ -533,6 +545,10 @@ int slash_execute(struct slash *slash, char *line)
 	struct slash_command *command, *cur;
 	char *args, *argv[SLASH_ARG_MAX];
 	int ret, argc = 0;
+
+	/* Fast path for empty lines or comments */
+	if (slash_line_empty_or_comment(line, strlen(line)))
+		return 0;
 
 	command = slash_command_find(slash, line, strlen(line), &args);
 	if (!command) {
