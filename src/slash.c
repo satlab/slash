@@ -630,7 +630,6 @@ static bool slash_complete_confirm(struct slash *slash, int matches)
 		return true;
 
 	slash_printf(slash, "Display all %d possibilities? (y or n) ", matches);
-	fflush(stdout);
 	do {
 		if (c != 'y')
 			slash_bell(slash);
