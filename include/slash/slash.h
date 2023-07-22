@@ -32,60 +32,10 @@
 #endif
 
 /* Helper macros */
-#define slash_offsetof(type, member) ((size_t) &((type *)0)->member)
-
-#define slash_container_of(ptr, type, member) ({		\
-	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
-	(type *)( (void *)__mptr - offsetof(type,member) );})
-
 #define slash_max(a,b) \
 	({ __typeof__ (a) _a = (a); \
 	__typeof__ (b) _b = (b); \
 	_a > _b ? _a : _b; })
-
-/* List functions */
-struct slash_list {
-	struct slash_list *prev;
-	struct slash_list *next;
-};
-
-#define SLASH_LIST_INIT(name) { &(name), &(name) }
-#define SLASH_LIST(name) struct slash_list name = SLASH_LIST_INIT(name)
-
-#define slash_list_for_each(pos, head, member)					\
-	for (pos = slash_container_of((head)->next, typeof(*pos), member);	\
-	     &pos->member != (head);						\
-	     pos = slash_container_of(pos->member.next, typeof(*pos), member))
-
-static inline bool slash_list_is_init(struct slash_list *list)
-{
-	return list->prev && list->next;
-}
-
-static inline void slash_list_init(struct slash_list *list)
-{
-	list->prev = list;
-	list->next = list;
-}
-
-static inline void slash_list_insert_tail(struct slash_list *list, struct slash_list *elm)
-{
-	elm->next = list;
-	elm->prev = list->prev;
-	list->prev = elm;
-	elm->prev->next = elm;
-}
-
-static inline int slash_list_empty(struct slash_list *list)
-{
-	return list->next == list;
-}
-
-static inline int slash_list_head(struct slash_list *list,
-				  struct slash_list *cur)
-{
-	return list == cur;
-}
 
 /* Command flags */
 #define SLASH_FLAG_HIDDEN	(1 << 0) /* Hidden and not shown in help or completion */
@@ -179,13 +129,6 @@ struct slash_command {
 
 	/* Parent command */
 	struct slash_command *parent;
-
-	/* Subcommand list */
-	struct slash_list sub;
-
-	/* List member structures */
-	struct slash_list command;
-	struct slash_list completion;
 };
 
 /* Slash context */

@@ -24,6 +24,10 @@ def configure(ctx):
             '-Wmissing-prototypes',
             '-Wno-unused-parameter']
 
+        ctx.env.LDFLAGS = [
+            '-Wl,-L{}'.format(ctx.path.find_node("linkerscript").abspath()),
+            '-Tslash.ld']
+
     ctx.check(header_name='termios.h', features='c cprogram', mandatory=False, define_name='SLASH_HAVE_TERMIOS_H')
     ctx.define_cond('SLASH_NO_EXIT', ctx.options.slash_disable_exit)
 

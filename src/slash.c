@@ -46,6 +46,7 @@
 /* Configuration */
 #define SLASH_ARG_MAX		16	/* Maximum number of arguments */
 #define SLASH_SHOW_MAX		25	/* Maximum number of commands to list */
+#define SLASH_COMPLETIONS_MAX	25	/* Maximum number of commands completions */
 
 /* Terminal codes */
 #define ESC '\x1b'
@@ -53,6 +54,18 @@
 
 #define CONTROL(code) (code - '@')
 #define ESCAPE(code) "\x1b[" code
+
+/* Created by GCC before and after slash ELF section */
+extern struct slash_command __start_slash;
+extern struct slash_command __stop_slash;
+
+/* Command section size */
+static unsigned long command_size;
+
+#define slash_command_list_for_each(cmd)	\
+	for (cmd = &__start_slash;		\
+	     cmd < &__stop_slash;		\
+	     cmd = (struct slash_command *)((unsigned long)cmd + command_size))
 
 /* Command-line option parsing */
 int slash_getopt(struct slash *slash, const char *opts)
@@ -285,13 +298,6 @@ static bool slash_line_empty_or_comment(char *line, size_t linelen)
 }
 
 /* Command handling */
-static int slash_command_compare(struct slash_command *c1,
-				 struct slash_command *c2)
-{
-	/* Compare names alphabetically */
-	return strcmp(c1->name, c2->name);
-}
-
 void slash_set_privileged(struct slash *slash, bool privileged)
 {
 	slash->privileged = privileged;
@@ -307,50 +313,6 @@ static bool slash_command_is_hidden(const struct slash *slash,
 		return true;
 
 	return false;
-}
-
-static int slash_command_register(struct slash *slash,
-				  struct slash_command *cmd,
-				  struct slash_command *parent)
-{
-	bool registered = false;
-	struct slash_list *list;
-	struct slash_command *cur;
-
-	/* Select parent command list */
-	if (parent) {
-		/* Make command hidden if parent is hidden */
-		cmd->flags |= parent->flags;
-
-		/* Insert in parent subcommand */
-		list = &parent->sub;
-
-		/* Ensure parent command list is initialized */
-		if (!slash_list_is_init(list))
-			slash_list_init(list);
-	} else {
-		/* Insert in top command list */
-		list = &slash->commands;
-	}
-
-	/* Ensure own subcommand list is initialized */
-	if (!slash_list_is_init(&cmd->sub))
-		slash_list_init(&cmd->sub);
-
-	/* Insert sorted by name */
-	slash_list_for_each(cur, list, command) {
-		if (slash_command_compare(cur, cmd) > 0) {
-			slash_list_insert_tail(&cur->command, &cmd->command);
-			registered = true;
-			break;
-		}
-	}
-
-	/* Insert as last member */
-	if (!registered)
-		slash_list_insert_tail(list, &cmd->command);
-
-	return 0;
 }
 
 static char *slash_command_line_token(char *line, size_t *len, char **next)
@@ -381,21 +343,22 @@ static char *slash_command_line_token(char *line, size_t *len, char **next)
 static struct slash_command *
 slash_command_find(struct slash *slash, char *line, size_t linelen, char **args)
 {
-	struct slash_list *start = &slash->commands;
 	struct slash_command *cur, *command = NULL;
 	char *next = line, *token;
 	size_t tokenlen, matchlen;
 	bool found;
 
-	while (!slash_list_empty(start) &&
-	      (token = slash_command_line_token(next, &tokenlen, &next))) {
-
+	while ((token = slash_command_line_token(next, &tokenlen, &next))) {
 		if (token >= line + linelen)
 			break;
 
 		found = false;
 
-		slash_list_for_each(cur, start, command) {
+		slash_command_list_for_each(cur) {
+			/* Skip if parent does not match */
+			if (cur->parent != command)
+				continue;
+
 			/* Skip if name does not match */
 			matchlen = slash_max(tokenlen, strlen(cur->name));
 			if (strncmp(token, cur->name, matchlen) != 0)
@@ -414,8 +377,6 @@ slash_command_find(struct slash *slash, char *line, size_t linelen, char **args)
 
 		if (!found)
 			break;
-
-		start = &command->sub;
 	}
 
 	return command;
@@ -520,6 +481,7 @@ static void slash_command_help(struct slash *slash, struct slash_command *comman
 	size_t slen;
 	const char *help = "";
 	struct slash_command *cur;
+	bool first = true;
 
 	if (command->help != NULL)
 		help = command->help;
@@ -531,12 +493,16 @@ static void slash_command_help(struct slash *slash, struct slash_command *comman
 	if (slen > 0 && help[slen - 1] != '\n')
 		slash_printf(slash, "\n");
 
-	if (!slash_list_empty(&command->sub)) {
-		slash_printf(slash,
-			     "\nAvailable subcommands in \'%s\' group:\n",
-			     command->name);
-		slash_list_for_each(cur, &command->sub, command)
+	slash_command_list_for_each(cur) {
+		if (cur->parent == command) {
+			if (first) {
+				slash_printf(slash,
+					     "\nAvailable subcommands in \'%s\' group:\n",
+					     command->name);
+				first = false;
+			}
 			slash_command_description(slash, cur);
+		}
 	}
 }
 
@@ -559,8 +525,10 @@ int slash_execute(struct slash *slash, char *line)
 	if (!command->func) {
 		slash_printf(slash, "Available subcommands in \'%s\' group:\n",
 			     command->name);
-		slash_list_for_each(cur, &command->sub, command)
-			slash_command_description(slash, cur);
+		slash_command_list_for_each(cur) {
+			if (cur->parent == command)
+				slash_command_description(slash, cur);
+		}
 		return -EINVAL;
 	}
 
@@ -614,14 +582,6 @@ static char *slash_last_word(char *line, size_t len, size_t *lastlen)
 	return word;
 }
 
-static void slash_show_completions(struct slash *slash, struct slash_list *completions)
-{
-	struct slash_command *cur;
-
-	slash_list_for_each(cur, completions, completion)
-		slash_command_description(slash, cur);
-}
-
 static bool slash_complete_confirm(struct slash *slash, int matches)
 {
 	char c = 'y';
@@ -668,12 +628,11 @@ static void slash_set_completion(struct slash *slash,
 
 static void slash_complete(struct slash *slash)
 {
-	int matches = 0;
+	int matches = 0, i;
 	size_t completelen = 0, commandlen = 0, prefixlen = SIZE_MAX;
 	char *complete, *args;
-	struct slash_list *search = &slash->commands;
 	struct slash_command *cur, *command = NULL, *prefix = NULL;
-	SLASH_LIST(completions);
+	struct slash_command *completions[SLASH_COMPLETIONS_MAX];
 
 	/* Find start of word to complete */
 	complete = slash_last_word(slash->buffer, slash->cursor, &completelen);
@@ -682,23 +641,22 @@ static void slash_complete(struct slash *slash)
 	/* Determine if we are completing sub command */
 	if (!slash_line_empty(slash->buffer, commandlen)) {
 		command = slash_command_find(slash, slash->buffer, commandlen, &args);
-		if (command && !slash_command_is_hidden(slash, command)) {
-			search = &command->sub;
-		} else {
+		if (!command || slash_command_is_hidden(slash, command))
 			return;
-		}
 	}
 
 	/* Search list for matches */
-	slash_list_for_each(cur, search, command) {
+	slash_command_list_for_each(cur) {
+		if (cur->parent != command)
+			continue;
+
 		if (slash_command_is_hidden(slash, cur))
 			continue;
 
 		if (strncmp(cur->name, complete, completelen) != 0)
 			continue;
 
-		slash_list_insert_tail(&completions, &cur->completion);
-		matches++;
+		completions[matches++] = cur;
 
 		/* Find common prefix */
 		if (prefixlen == SIZE_MAX) {
@@ -724,8 +682,10 @@ static void slash_complete(struct slash *slash)
 		slash_bell(slash);
 	} else {
 		slash_printf(slash, "\n");
-		if (slash_complete_confirm(slash, matches))
-			slash_show_completions(slash, &completions);
+		if (slash_complete_confirm(slash, matches)) {
+			for (i = 0; i < matches; i++)
+				slash_command_description(slash, completions[i]);
+		}
 	}
 }
 
@@ -1199,15 +1159,17 @@ static int slash_builtin_help(struct slash *slash)
 	char find[slash->line_size];
 	int i;
 	size_t available = sizeof(find);
-	struct slash_command *command;
+	struct slash_command *cur;
 
 	/* If no arguments given, just list all top-level commands */
 	if (slash->argc < 2) {
 		slash_printf(slash, "Available commands:\n");
-		slash_list_for_each(command, &slash->commands, command) {
-			if (slash_command_is_hidden(slash, command))
+		slash_command_list_for_each(cur) {
+			if (cur->parent)
 				continue;
-			slash_command_description(slash, command);
+			if (slash_command_is_hidden(slash, cur))
+				continue;
+			slash_command_description(slash, cur);
 		}
 		return SLASH_SUCCESS;
 	}
@@ -1220,13 +1182,13 @@ static int slash_builtin_help(struct slash *slash)
 		strcat(find, slash->argv[i]);
 		strcat(find, " ");
 	}
-	command = slash_command_find(slash, find, strlen(find), &args);
-	if (!command) {
+	cur = slash_command_find(slash, find, strlen(find), &args);
+	if (!cur) {
 		slash_printf(slash, "No such command: %s\n", find);
 		return SLASH_EINVAL;
 	}
 
-	slash_command_help(slash, command);
+	slash_command_help(slash, cur);
 
 	return SLASH_SUCCESS;
 }
@@ -1327,12 +1289,6 @@ int slash_loop(struct slash *slash, const char *prompt_good, const char *prompt_
 struct slash *slash_create(size_t line_size, size_t history_size)
 {
 	struct slash *slash;
-	struct slash_command *cmd;
-	unsigned long command_size;
-
-	/* Created by GCC before and after slash ELF section */
-	extern struct slash_command __start_slash;
-	extern struct slash_command __stop_slash;
 
 	/* Allocate slash context */
 	slash = calloc(1, sizeof(*slash));
@@ -1371,14 +1327,6 @@ struct slash *slash_create(size_t line_size, size_t history_size)
 	/* Calculate command section size */
 	command_size = labs((long)&slash_cmd_help -
 			    (long)&slash_cmd_history);
-
-	/* Register commands */
-	slash_list_init(&slash->commands);
-	for (cmd = &__start_slash;
-	     cmd < &__stop_slash;
-	     cmd = (struct slash_command *)((unsigned long)cmd + command_size)) {
-		slash_command_register(slash, cmd, cmd->parent);
-	}
 
 	return slash;
 }
