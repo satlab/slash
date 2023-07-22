@@ -42,8 +42,7 @@
 #define SLASH_FLAG_PRIVILEGED	(1 << 1) /* Privileged and hidden until enabled with slash_set_privileged() */
 
 #define __slash_command(_ident, _group, _name, _func, _args, _help, _flags, _context) \
-	__attribute__((section(".slash." # _ident)))			\
-	__attribute__((used))						\
+	__attribute__((section(".slash." # _ident), used, aligned(sizeof(long)))) \
 	struct slash_command _ident = {					\
 		.name  = #_name,					\
 		.parent = _group,					\

@@ -59,13 +59,10 @@
 extern struct slash_command __start_slash;
 extern struct slash_command __stop_slash;
 
-/* Command section size */
-static unsigned long command_size;
-
 #define slash_command_list_for_each(cmd)	\
 	for (cmd = &__start_slash;		\
 	     cmd < &__stop_slash;		\
-	     cmd = (struct slash_command *)((unsigned long)cmd + command_size))
+	     cmd++)
 
 /* Command-line option parsing */
 int slash_getopt(struct slash *slash, const char *opts)
@@ -1323,10 +1320,6 @@ struct slash *slash_create(size_t line_size, size_t history_size)
 	slash->history_tail = slash->history;
 	slash->history_cursor = slash->history;
 	slash->history_avail = slash->history_size - 1;
-
-	/* Calculate command section size */
-	command_size = labs((long)&slash_cmd_help -
-			    (long)&slash_cmd_history);
 
 	return slash;
 }
