@@ -92,7 +92,7 @@ static inline int slash_list_head(struct slash_list *list,
 #define SLASH_FLAG_PRIVILEGED	(1 << 1) /* Privileged and hidden until enabled with slash_set_privileged() */
 
 #define __slash_command(_ident, _group, _name, _func, _args, _help, _flags, _context) \
-	__attribute__((section("slash")))				\
+	__attribute__((section(".slash." # _ident)))			\
 	__attribute__((used))						\
 	struct slash_command _ident = {					\
 		.name  = #_name,					\
@@ -124,7 +124,7 @@ static inline int slash_list_head(struct slash_list *list,
 
 /* Subsubcommand */
 #define slash_command_subsub_ex(_group, _subgroup, _name, _func, _args, _help, _flags, _context) \
-	__slash_command(slash_cmd_ ## _group ## _ ## _subgroup ## _name,\
+	__slash_command(slash_cmd_ ## _group ## _ ## _subgroup ## _ ## _name,\
 			&(slash_cmd_ ## _group ## _ ## _subgroup),	\
 			_name, _func, _args, _help, _flags, _context)
 
@@ -190,9 +190,6 @@ struct slash_command {
 
 /* Slash context */
 struct slash {
-	/* Commands */
-	struct slash_list commands;
-
 	/* Terminal handling */
 #ifdef SLASH_HAVE_TERMIOS_H
 	struct termios original;
