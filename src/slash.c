@@ -138,13 +138,15 @@ static size_t slash_escaped_strlen(const char *s)
 
 static int slash_rawmode_enable(struct slash *slash)
 {
-	if (!isatty(slash->fd_read))
+#ifdef SLASH_HAVE_TERMIOS_H
+	int fd = fileno(slash->file_read);
+
+	if (!isatty(fd))
 		return 0;
 
-#ifdef SLASH_HAVE_TERMIOS_H
 	struct termios raw;
 
-	if (tcgetattr(slash->fd_read, &slash->original) < 0)
+	if (tcgetattr(fd, &slash->original) < 0)
 		return -ENOTTY;
 
 	raw = slash->original;
@@ -153,7 +155,7 @@ static int slash_rawmode_enable(struct slash *slash)
 	raw.c_cc[VMIN] = 1;
 	raw.c_cc[VTIME] = 0;
 
-	if (tcsetattr(slash->fd_read, TCSANOW, &raw) < 0)
+	if (tcsetattr(fd, TCSANOW, &raw) < 0)
 		return -ENOTTY;
 #endif
 	return 0;
@@ -161,11 +163,13 @@ static int slash_rawmode_enable(struct slash *slash)
 
 static int slash_rawmode_disable(struct slash *slash)
 {
-	if (!isatty(slash->fd_read))
+#ifdef SLASH_HAVE_TERMIOS_H
+	int fd = fileno(slash->file_read);
+
+	if (!isatty(fd))
 		return 0;
 
-#ifdef SLASH_HAVE_TERMIOS_H
-	if (tcsetattr(slash->fd_read, TCSANOW, &slash->original) < 0)
+	if (tcsetattr(fd, TCSANOW, &slash->original) < 0)
 		return -ENOTTY;
 #endif
 	return 0;
@@ -189,12 +193,12 @@ static int slash_restore_term(struct slash *slash)
 
 static int slash_write(struct slash *slash, const char *buf, size_t count)
 {
-	return write(slash->fd_write, buf, count);
+	return fwrite(buf, 1, count, slash->file_write) == count ? (int)count : -1;
 }
 
 static int slash_read(struct slash *slash, void *buf, size_t count)
 {
-	return read(slash->fd_read, buf, count);
+	return fread(buf, 1, count, slash->file_read) == count ? (int)count : -1;
 }
 
 static int slash_putchar(struct slash *slash, char c)
@@ -215,7 +219,7 @@ static int slash_getchar(struct slash *slash)
 #ifdef SLASH_HAVE_SELECT
 static int slash_wait_select(struct slash *slash, unsigned int ms)
 {
-	int ret = -ETIMEDOUT;
+	int ret = -ETIMEDOUT, fd;
 	char c;
 	fd_set fds;
 	struct timeval timeout;
@@ -223,10 +227,11 @@ static int slash_wait_select(struct slash *slash, unsigned int ms)
 	timeout.tv_sec = ms / 1000;
 	timeout.tv_usec = (ms - timeout.tv_sec * 1000) * 1000;
 
+	fd = fileno(slash->file_read);
 	FD_ZERO(&fds);
-	FD_SET(slash->fd_read, &fds);
+	FD_SET(fd, &fds);
 
-	fcntl(slash->fd_read, F_SETFL, fcntl(slash->fd_read, F_GETFL) |  O_NONBLOCK);
+	fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) |  O_NONBLOCK);
 
 	ret = select(1, &fds, NULL, NULL, &timeout);
 	if (ret == 1) {
@@ -234,7 +239,7 @@ static int slash_wait_select(struct slash *slash, unsigned int ms)
 		ret = (unsigned char)c;
 	}
 
-	fcntl(slash->fd_read, F_SETFL, fcntl(slash->fd_read, F_GETFL) & ~O_NONBLOCK);
+	fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) & ~O_NONBLOCK);
 
 	return ret;
 }
@@ -261,7 +266,7 @@ int slash_printf(struct slash *slash, const char *format, ...)
 
 	va_start(args, format);
 
-	ret = vdprintf(slash->fd_write, format, args);
+	ret = vfprintf(slash->file_write, format, args);
 
 	va_end(args);
 
@@ -1293,8 +1298,8 @@ struct slash *slash_create(size_t line_size, size_t history_size)
 		return NULL;
 
 	/* Setup default values */
-	slash->fd_read = STDIN_FILENO;
-	slash->fd_write = STDOUT_FILENO;
+	slash->file_read = stdin;
+	slash->file_write = stdout;
 #ifdef SLASH_HAVE_SELECT
 	slash->waitfunc = slash_wait_select;
 #endif

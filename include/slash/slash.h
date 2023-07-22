@@ -24,6 +24,7 @@
 #ifndef _SLASH_H_
 #define _SLASH_H_
 
+#include <stdio.h>
 #include <stddef.h>
 #include <stdbool.h>
 
@@ -136,8 +137,8 @@ struct slash {
 #ifdef SLASH_HAVE_TERMIOS_H
 	struct termios original;
 #endif
-	int fd_write;
-	int fd_read;
+	FILE *file_write;
+	FILE *file_read;
 	slash_waitfunc_t waitfunc;
 	bool use_activate;
 	bool privileged;
