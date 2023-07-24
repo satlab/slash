@@ -182,6 +182,10 @@ struct slash *slash_create(size_t line_size, size_t history_size);
 
 void slash_destroy(struct slash *slash);
 
+int slash_init(struct slash *slash,
+	       char *line, size_t line_size,
+	       char *history, size_t history_size);
+
 int slash_refresh(struct slash *slash);
 
 void slash_reset(struct slash *slash);

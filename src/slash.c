@@ -1288,14 +1288,14 @@ int slash_loop(struct slash *slash, const char *prompt_good, const char *prompt_
 	return 0;
 }
 
-struct slash *slash_create(size_t line_size, size_t history_size)
+int slash_init(struct slash *slash,
+	       char *line, size_t line_size,
+	       char *history, size_t history_size)
 {
-	struct slash *slash;
-
-	/* Allocate slash context */
-	slash = calloc(1, sizeof(*slash));
-	if (!slash)
-		return NULL;
+	/* Ensure context and buffers are zero */
+	memset(slash, 0, sizeof(*slash));
+	memset(line, 0, line_size);
+	memset(history, 0, history_size);
 
 	/* Setup default values */
 	slash->file_read = stdin;
@@ -1304,29 +1304,42 @@ struct slash *slash_create(size_t line_size, size_t history_size)
 	slash->waitfunc = slash_wait_select;
 #endif
 
-	/* Allocate zero-initialized line and history buffers */
+	/* Initialize line buffer */
+	slash->buffer = line;
 	slash->line_size = line_size;
-	slash->buffer = calloc(1, slash->line_size);
-	if (!slash->buffer) {
-		free(slash);
-		return NULL;
-	}
-
-	slash->history_size = history_size;
-	slash->history = calloc(1, slash->history_size);
-	if (!slash->history) {
-		free(slash->buffer);
-		free(slash);
-		return NULL;
-	}
 
 	/* Initialize history */
+	slash->history = history;
+	slash->history_size = history_size;
 	slash->history_head = slash->history;
 	slash->history_tail = slash->history;
 	slash->history_cursor = slash->history;
 	slash->history_avail = slash->history_size - 1;
 
-	return slash;
+	return 0;
+}
+
+struct slash *slash_create(size_t line_size, size_t history_size)
+{
+	struct slash *slash = NULL;
+	char *line = NULL, *history = NULL;
+
+	/* Allocate slash context and buffers */
+	slash = malloc(sizeof(*slash));
+	line = malloc(line_size);
+	history = malloc(history_size);
+
+	if (slash && line && history) {
+		if (!slash_init(slash, line, line_size, history, history_size))
+			return slash;
+	}
+
+	/* Allocation or initialization error */
+	free(slash);
+	free(line);
+	free(history);
+
+	return NULL;
 }
 
 void slash_destroy(struct slash *slash)
