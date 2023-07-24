@@ -1304,6 +1304,10 @@ int slash_init(struct slash *slash,
 	slash->waitfunc = slash_wait_select;
 #endif
 
+	/* Disable stream buffering */
+	setvbuf(slash->file_read, NULL, _IONBF, 0);
+	setvbuf(slash->file_write, NULL, _IONBF, 0);
+
 	/* Initialize line buffer */
 	slash->buffer = line;
 	slash->line_size = line_size;
