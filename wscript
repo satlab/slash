@@ -8,13 +8,16 @@ top = '.'
 build = 'build'
 
 def options(ctx):
+    if len(ctx.stack_path) < 2:
+        ctx.load('compiler_c')
+
     gr = ctx.add_option_group('slash options')
     gr.add_option('--slash-disable-exit', action='store_true', help='Disable exit command')
 
 def configure(ctx):
     # Load tool and set CFLAGS if not being recursed
     if len(ctx.stack_path) < 2:
-        ctx.load('gcc')
+        ctx.load('compiler_c')
         ctx.env.CFLAGS = [
             '-std=gnu11', '-Os', '-gdwarf',
             '-Wall',
@@ -33,16 +36,14 @@ def configure(ctx):
 
 def build(ctx):
     if len(ctx.stack_path) < 2:
-        ctx.load('gcc')
+        ctx.load('compiler_c')
+        ctx.program(
+            target   = APPNAME + 'test',
+            source   = 'test/slashtest.c',
+            use      = APPNAME)
 
     ctx.objects(
         target   = APPNAME,
         source   = 'src/slash.c',
         includes = 'include',
         export_includes = 'include')
-
-    if len(ctx.stack_path) < 2:
-        ctx.program(
-            target   = APPNAME + 'test',
-            source   = 'test/slashtest.c',
-            use      = APPNAME)
