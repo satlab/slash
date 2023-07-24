@@ -13,6 +13,7 @@ def options(ctx):
 
     gr = ctx.add_option_group('slash options')
     gr.add_option('--slash-disable-exit', action='store_true', help='Disable exit command')
+    gr.add_option('--slash-disable-linkerscript', action='store_true', help='Disable linker script insert')
 
 def configure(ctx):
     # Load tool and set CFLAGS if not being recursed
@@ -27,8 +28,12 @@ def configure(ctx):
             '-Wmissing-prototypes',
             '-Wno-unused-parameter']
 
-        ctx.env.LDFLAGS = [
-            '-Wl,-L{}'.format(ctx.path.find_node("linkerscript").abspath()),
+    # Insert linker script if not explicitly disabled
+    # or another linkerscript has been defined
+    if (not ctx.options.slash_disable_linkerscript and
+        not [x for x in ctx.env.LDFLAGS if x.startswith('-T')]):
+        ctx.env.LDFLAGS += [
+            '-Wl,-L{}'.format(ctx.path.find_node("linkerscript")),
             '-Tslash.ld']
 
     ctx.check(header_name='termios.h', features='c cprogram', mandatory=False, define_name='SLASH_HAVE_TERMIOS_H')
