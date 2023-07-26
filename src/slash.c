@@ -43,11 +43,6 @@
 #include <sys/select.h>
 #endif
 
-/* Configuration */
-#define SLASH_ARG_MAX		16	/* Maximum number of arguments */
-#define SLASH_SHOW_MAX		25	/* Maximum number of commands to list */
-#define SLASH_COMPLETIONS_MAX	25	/* Maximum number of commands completions */
-
 /* Terminal codes */
 #define ESC '\x1b'
 #define DEL '\x7f'
@@ -384,7 +379,7 @@ slash_command_find(struct slash *slash, char *line, size_t linelen, char **args)
 	return command;
 }
 
-static int slash_build_args(char *args, char **argv, int *argc)
+static int slash_build_args(struct slash *slash, char *args)
 {
 	/* Quote level */
 	enum {
@@ -393,9 +388,9 @@ static int slash_build_args(char *args, char **argv, int *argc)
 		SLASH_QUOTE_DOUBLE,
 	} quote = SLASH_QUOTE_NONE;
 
-	*argc = 0;
+	slash->argc = 0;
 
-	while (*args && *argc < SLASH_ARG_MAX) {
+	while (*args && slash->argc < SLASH_ARG_MAX) {
 		/* Check for quotes */
 		if (*args == '\'') {
 			quote = SLASH_QUOTE_SINGLE;
@@ -406,7 +401,7 @@ static int slash_build_args(char *args, char **argv, int *argc)
 		}
 
 		/* Argument starts here */
-		argv[(*argc)++] = args;
+		slash->argv[slash->argc++] = args;
 
 		/* Loop over input argument */
 		while (*args) {
@@ -435,10 +430,14 @@ static int slash_build_args(char *args, char **argv, int *argc)
 
 	/* Test for quote mismatch */
 	if (quote != SLASH_QUOTE_NONE)
-		return -1;
+		return -EINVAL;
+
+	/* If args does not point to NULL, we ran out of argv space */
+	if (*args)
+		return -E2BIG;
 
 	/* According to C11 section 5.1.2.2.1, argv[argc] must be NULL */
-	argv[*argc] = NULL;
+	slash->argv[slash->argc] = NULL;
 
 	return 0;
 }
@@ -511,8 +510,8 @@ static void slash_command_help(struct slash *slash, struct slash_command *comman
 int slash_execute(struct slash *slash, char *line)
 {
 	struct slash_command *command, *cur;
-	char *args, *argv[SLASH_ARG_MAX];
-	int ret, argc = 0;
+	char *args;
+	int ret;
 
 	/* Fast path for empty lines or comments */
 	if (slash_line_empty_or_comment(line, strlen(line)))
@@ -535,9 +534,15 @@ int slash_execute(struct slash *slash, char *line)
 	}
 
 	/* Build args */
-	if (slash_build_args(args, argv, &argc) < 0) {
-		slash_printf(slash, "Mismatched quotes\n");
-		return -EINVAL;
+	ret = slash_build_args(slash, args);
+	if (ret < 0) {
+		if (ret == -EINVAL)
+			slash_printf(slash, "Mismatched quotes\n");
+		else if (ret == -E2BIG)
+			slash_printf(slash, "Too many arguments\n");
+		else
+			slash_printf(slash, "Invalid arguments\n");
+		return ret;
 	}
 
 	/* Reset state for slash_getopt */
@@ -549,9 +554,6 @@ int slash_execute(struct slash *slash, char *line)
 
 	/* Set command context */
 	slash->context = command->context;
-
-	slash->argc = argc;
-	slash->argv = argv;
 
 	ret = command->func(slash);
 
@@ -628,13 +630,28 @@ static void slash_set_completion(struct slash *slash,
 	slash->cursor = slash->length = strlen(slash->buffer);
 }
 
+static bool slash_complete_matches(struct slash *slash,
+				   struct slash_command *command,
+				   struct slash_command *cur,
+				   char *complete, size_t completelen)
+{
+	if (cur->parent != command)
+		return false;
+
+	if (slash_command_is_hidden(slash, cur))
+		return false;
+
+	if (strncmp(cur->name, complete, completelen) != 0)
+		return false;
+
+	return true;
+}
+
 static void slash_complete(struct slash *slash)
 {
-	int matches = 0, i;
-	size_t completelen = 0, commandlen = 0, prefixlen = SIZE_MAX;
+	size_t completelen = 0, commandlen = 0, prefixlen = 0;
 	char *complete, *args;
 	struct slash_command *cur, *command = NULL, *prefix = NULL;
-	struct slash_command *completions[SLASH_COMPLETIONS_MAX];
 
 	/* Find start of word to complete */
 	complete = slash_last_word(slash->buffer, slash->cursor, &completelen);
@@ -648,20 +665,16 @@ static void slash_complete(struct slash *slash)
 	}
 
 	/* Search list for matches */
+	slash->matches = 0;
 	slash_command_list_for_each(cur) {
-		if (cur->parent != command)
+		if (!slash_complete_matches(slash, command, cur,
+					    complete, completelen))
 			continue;
 
-		if (slash_command_is_hidden(slash, cur))
-			continue;
-
-		if (strncmp(cur->name, complete, completelen) != 0)
-			continue;
-
-		completions[matches++] = cur;
+		slash->matches++;
 
 		/* Find common prefix */
-		if (prefixlen == SIZE_MAX) {
+		if (!prefix) {
 			prefix = cur;
 			prefixlen = strlen(prefix->name);
 		} else {
@@ -670,23 +683,29 @@ static void slash_complete(struct slash *slash)
 	}
 
 	/* Complete or list matches */
-	if (!matches) {
+	if (!slash->matches) {
 		if (command) {
 			slash_printf(slash, "\n");
 			slash_command_usage(slash, command);
 		} else {
 			slash_bell(slash);
 		}
-	} else if (matches == 1) {
+	} else if (slash->matches == 1) {
 		slash_set_completion(slash, complete, prefix->name, prefixlen, true);
 	} else if (slash->last_char != '\t') {
 		slash_set_completion(slash, complete, prefix->name, prefixlen, false);
 		slash_bell(slash);
 	} else {
 		slash_printf(slash, "\n");
-		if (slash_complete_confirm(slash, matches)) {
-			for (i = 0; i < matches; i++)
-				slash_command_description(slash, completions[i]);
+		if (slash_complete_confirm(slash, slash->matches)) {
+			/* List matches */
+			slash_command_list_for_each(cur) {
+				if (!slash_complete_matches(slash, command, cur,
+							    complete, completelen))
+					continue;
+
+				slash_command_description(slash, cur);
+			}
 		}
 	}
 }

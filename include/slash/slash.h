@@ -32,6 +32,10 @@
 #include <termios.h>
 #endif
 
+/* Configuration */
+#define SLASH_SHOW_MAX		25	/* Maximum number of commands to list */
+#define SLASH_ARG_MAX		16	/* Maximum number of arguments, including command name */
+
 /* Helper macros */
 #define slash_max(a,b) \
 	({ __typeof__ (a) _a = (a); \
@@ -155,6 +159,9 @@ struct slash {
 	bool escaped;
 	char last_char;
 
+	/* Completion */
+	size_t matches;
+
 	/* History */
 	size_t history_size;
 	int history_depth;
@@ -165,8 +172,8 @@ struct slash {
 	char *history_tail;
 	char *history_cursor;
 
-	/* Command interface */
-	char **argv;
+	/* Command interface (1 arg required for final NULL value) */
+	char *argv[SLASH_ARG_MAX + 1];
 	int argc;
 	void *context;
 
