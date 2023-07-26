@@ -1157,10 +1157,8 @@ char *slash_readline(struct slash *slash, const char *prompt)
 /* Builtin commands */
 static int slash_builtin_help(struct slash *slash)
 {
-	char *args;
-	char find[slash->line_size];
 	int i;
-	size_t available = sizeof(find);
+	char *args;
 	struct slash_command *cur;
 
 	/* If no arguments given, just list all top-level commands */
@@ -1176,17 +1174,13 @@ static int slash_builtin_help(struct slash *slash)
 		return SLASH_SUCCESS;
 	}
 
-	find[0] = '\0';
+	/* Unbuild args */
+	for (i = 2; i < slash->argc; i++)
+		*(slash->argv[i] - 1) = ' ';
 
-	for (i = 1; i < slash->argc; i++) {
-		if (strlen(slash->argv[i]) >= available)
-			return SLASH_ENOSPC;
-		strcat(find, slash->argv[i]);
-		strcat(find, " ");
-	}
-	cur = slash_command_find(slash, find, strlen(find), &args);
+	cur = slash_command_find(slash, slash->argv[1], strlen(slash->argv[1]), &args);
 	if (!cur) {
-		slash_printf(slash, "No such command: %s\n", find);
+		slash_printf(slash, "No such command: %s\n", slash->argv[1]);
 		return SLASH_EINVAL;
 	}
 
