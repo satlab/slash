@@ -303,11 +303,16 @@ void slash_set_privileged(struct slash *slash, bool privileged)
 static bool slash_command_is_hidden(const struct slash *slash,
 				    const struct slash_command *cmd)
 {
-	if (cmd->flags & SLASH_FLAG_HIDDEN)
-		return true;
+	while (cmd) {
+		if (cmd->flags & SLASH_FLAG_HIDDEN)
+			return true;
 
-	if (!slash->privileged && (cmd->flags & SLASH_FLAG_PRIVILEGED))
-		return true;
+		if (!slash->privileged && (cmd->flags & SLASH_FLAG_PRIVILEGED))
+			return true;
+
+		/* Check that parent command is also not hidden */
+		cmd = cmd->parent;
+	}
 
 	return false;
 }
