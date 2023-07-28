@@ -159,9 +159,6 @@ struct slash {
 	bool escaped;
 	char last_char;
 
-	/* Completion */
-	size_t matches;
-
 	/* History */
 	size_t history_size;
 	int history_depth;

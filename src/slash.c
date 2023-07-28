@@ -656,7 +656,7 @@ static bool slash_complete_matches(struct slash *slash,
 
 static void slash_complete(struct slash *slash)
 {
-	size_t completelen = 0, commandlen = 0, prefixlen = 0;
+	size_t completelen = 0, commandlen = 0, prefixlen = 0, matches;
 	char *complete, *args;
 	struct slash_command *cur, *command = NULL, *prefix = NULL;
 
@@ -672,13 +672,13 @@ static void slash_complete(struct slash *slash)
 	}
 
 	/* Search list for matches */
-	slash->matches = 0;
+	matches = 0;
 	slash_command_list_for_each(cur) {
 		if (!slash_complete_matches(slash, command, cur,
 					    complete, completelen))
 			continue;
 
-		slash->matches++;
+		matches++;
 
 		/* Find common prefix */
 		if (!prefix) {
@@ -690,21 +690,21 @@ static void slash_complete(struct slash *slash)
 	}
 
 	/* Complete or list matches */
-	if (!slash->matches) {
+	if (!matches) {
 		if (command) {
 			slash_printf(slash, "\n");
 			slash_command_usage(slash, command);
 		} else {
 			slash_bell(slash);
 		}
-	} else if (slash->matches == 1) {
+	} else if (matches == 1) {
 		slash_set_completion(slash, complete, prefix->name, prefixlen, true);
 	} else if (slash->last_char != '\t') {
 		slash_set_completion(slash, complete, prefix->name, prefixlen, false);
 		slash_bell(slash);
 	} else {
 		slash_printf(slash, "\n");
-		if (slash_complete_confirm(slash, slash->matches)) {
+		if (slash_complete_confirm(slash, matches)) {
 			/* List matches */
 			slash_command_list_for_each(cur) {
 				if (!slash_complete_matches(slash, command, cur,
