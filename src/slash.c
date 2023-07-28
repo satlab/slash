@@ -80,7 +80,8 @@ int slash_getopt(struct slash *slash, const char *opts)
 	slash->optopt = c = slash->argv[slash->optind][slash->sp];
 
 	if (c == ':' || (cp = strchr(opts, c)) == NULL) {
-		slash_printf(slash, "Unknown option -%c\n", c);
+		if (slash->opterr)
+			slash_printf(slash, "Unknown option -%c\n", c);
 		if (slash->argv[slash->optind][++(slash->sp)] == '\0') {
 			slash->optind++;
 			slash->sp = 1;
@@ -92,7 +93,8 @@ int slash_getopt(struct slash *slash, const char *opts)
 		if (slash->argv[slash->optind][slash->sp+1] != '\0') {
 			slash->optarg = &slash->argv[(slash->optind)++][slash->sp+1];
 		} else if(++(slash->optind) >= slash->argc) {
-			slash_printf(slash, "Option -%c requires an argument\n", c);
+			if (slash->opterr)
+				slash_printf(slash, "Option -%c requires an argument\n", c);
 			slash->sp = 1;
 			return '?';
 		} else {
