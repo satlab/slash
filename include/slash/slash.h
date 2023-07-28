@@ -117,25 +117,65 @@ typedef int (*slash_waitfunc_t)(struct slash *slash, unsigned int ms);
 #define SLASH_ENOENT	(-6)
 #define SLASH_EHELP	(-7)
 
-/* Command struct */
+/**
+ * struct slash_command - Command description.
+ * @name: Name of the command.
+ * @func: Pointer to the handler function for this command.
+ * @args: Pointer to the argument description string or NULL if the function
+ * does not take arguments.
+ * @help: Pointer to the help string for the command.
+ * @flags: Bitwise OR of one or more SLASH_FLAG_XXX values.
+ * @context: Optional context pointer to pass to function instance.
+ * @parent: Pointer to parent command or NULL if the function is a root
+ * function.
+ *
+ * This struct should only be instantiated using the slash_command() macros.
+ */
 struct slash_command {
-	/* Static data */
 	const char *name;
 	const slash_func_t func;
 	const char *args;
 	const char *help;
-
-	/* Flags */
 	unsigned int flags;
-
-	/* Command context */
 	void *context;
-
-	/* Parent command */
 	struct slash_command *parent;
 };
 
-/* Slash context */
+/**
+ * struct slash_context - Slash context.
+ * @original: Original termios structure for restoring terminal settings.
+ * @file_write: File pointer used for output.
+ * @file_read: File pointer used for input.
+ * @waitfunc: Low-level function used for slash_wait_interruptible().
+ * @use_activated: True if the console should require activation before use.
+ * @privileged: True if the console is in privileged mode.
+ * @exit_inhibit: True if exit should be inhibited in this console.
+ * @line_size: Size in bytes of the line buffer.
+ * @prompt: Current prompt string.
+ * @prompt_length: Length in bytes of the prompt string.
+ * @prompt_print_length: Length in printable characters of the prompt string.
+ * @buffer: Pointer to line buffer memory.
+ * @cursor: Current index of cursor in line buffer.
+ * @length: Current amount of used bytes in line buffer.
+ * @last_char: Last input character.
+ * @history_size: Size in byte of the history buffer.
+ * @history_depth: Number of history entries browsed back.
+ * @history_avail: Number of available bytes in history.
+ * @history_rewind_length: Number of bytes in history buffer used for temporary
+ * storage while browsing.
+ * @history: Pointer to history buffer memory.
+ * @history_head: Pointer to first byte of circular history buffer.
+ * @history_tail: Pointer to last byte of circular history buffer.
+ * @history_cursor: Current cursor when browsing history.
+ * @argv: Argument vector passed to commands.
+ * @argc: Number of valid arguments in argv.
+ * @context: Context pointer from command registration.
+ * @optarg: Pointer to current option argument.
+ * @optind: Index of the first non-option argument.
+ * @opterr: Print warning on unknown option or missing argument.
+ * @optopt: Last option character.
+ * @sp: Internal getopt parser state.
+ */
 struct slash {
 	/* Terminal handling */
 #ifdef SLASH_HAVE_TERMIOS_H
@@ -181,38 +221,170 @@ struct slash {
 	int sp;
 };
 
+/**
+ * slash_create() - Allocate slash context and buffers.
+ * @line_size: Number of bytes to allocate for the line buffer.
+ * @history_size: Number of bytes to allocate for the history buffer.
+ *
+ * This command dynamically allocates a new slash context and buffers for the
+ * command line and history. The allocated memory should be freed using
+ * slash_destroy() when no longer needed.
+ *
+ * Return: a pointer to a new slash context, or NULL if the context could not
+ * be allocated.
+ */
 struct slash *slash_create(size_t line_size, size_t history_size);
 
+/**
+ * slash_destroy() - Free slash context and buffers.
+ * @slash: slash context to free.
+ *
+ * This command frees a slash context and buffers that was previously been
+ * allocated with slash_destroy().
+ */
 void slash_destroy(struct slash *slash);
 
+/**
+ * slash_init() - Initialize slash context and buffers.
+ * @slash: slash context to initialize.
+ * @line: Pointer to line buffer.
+ * @line_size: Size in bytes of the line buffer.
+ * @history: Pointer to history buffer.
+ * @history_size: Size in bytes of the history buffer.
+ *
+ * This command frees a slash context and buffers that was previously been
+ * allocated with slash_destroy().
+ *
+ * Return: 0 if the initialization was successful, negative error value otherwise.
+ */
 int slash_init(struct slash *slash,
 	       char *line, size_t line_size,
 	       char *history, size_t history_size);
 
+
+/**
+ * slash_refresh() - Write current line buffer to terminal.
+ * @slash: slash context.
+ *
+ * Return: 0 if the write succeeded, -1 otherwise.
+ */
 int slash_refresh(struct slash *slash);
 
+/**
+ * slash_reset() - Reset line buffer to empty line.
+ * @slash: slash context.
+ */
 void slash_reset(struct slash *slash);
 
+/**
+ * slash_readline() - Read line from user.
+ * @slash: slash context.
+ * @prompt: Prompt string to print before line.
+ *
+ * Return: Pointer to input string, NULL if the user pressed ^D.
+ */
 char *slash_readline(struct slash *slash, const char *prompt);
 
+/**
+ * slash_execute() - Execute command.
+ * @slash: slash context.
+ * @line: Buffer with command line to execute.
+ *
+ * Return: Return value from executed command, or
+ * -ENOENT if the command could not be found, or
+ * -EISDIR if the command is a group, or
+ * -EINVAL if the command contained mismatched quotes, or
+ * -E2BIG if the command contained too many arguments
+ */
 int slash_execute(struct slash *slash, char *line);
 
+/**
+ * slash_loop() - Continuously read and execute commands.
+ * @slash: slash context.
+ * @prompt_good: Prompt if last command was successful.
+ * @prompt_bad: Prompt if last command was not successful.
+ *
+ * Return: 0 if the user exited the console, or
+ * -ENOTTY if the terminal could not be configured.
+ */
 int slash_loop(struct slash *slash, const char *prompt_good, const char *prompt_bad);
 
+/**
+ * slash_wait_interruptible() - Wait for keypress.
+ * @slash: slash context.
+ * @ms: Maximum number of milliseconds to wait.
+ *
+ * Return: return valid from waitfunc or -ENOSYS if no waitfunc has been specified.
+ */
 int slash_wait_interruptible(struct slash *slash, unsigned int ms);
 
+/**
+ * slash_set_wait_interruptible() - Set wait function.
+ * @slash: slash context.
+ * @waitfunc: New wait function.
+ *
+ * The wait function should match the slash_waitfunc_t prototype and return the
+ * received character or -ETIMEDOUT if no character was received before the
+ * timeout expired.
+ *
+ * Return: This function always succeeds and returns 0.
+ */
 int slash_set_wait_interruptible(struct slash *slash, slash_waitfunc_t waitfunc);
 
+/**
+ * slash_printf() - Print formatted data.
+ * @slash: slash context.
+ * @format: Format string.
+ *
+ * This function prints formatted string to the output file pointer.
+ *
+ * Return: This function is just a wrapper around printf and thus has the same
+ * return value.
+ */
 int slash_printf(struct slash *slash, const char *format, ...);
 
+/**
+ * slash_getop() - Parse command-line options
+ * @slash: slash context.
+ * @optstring: Options string.
+ *
+ * This function walks the slash->argv[] array, looking for optional arguments.
+ * The optstring is a sequence of option characters to look for, each one
+ * optionally followed by ':' to indicate that the option expects an argument.
+ *
+ * Return: For each found option, the option character is returned. If an
+ * invalid option character is found, or a option character is missing an
+ * argument, '?' is returned. When no more options are found, -1 is returned.
+ */
 int slash_getopt(struct slash *slash, const char *optstring);
 
+/**
+ * slash_clear_screen() - Clear the screen.
+ * @slash: slash context.
+ *
+ * Clears the screen using terminal escape sequence.
+ */
 void slash_clear_screen(struct slash *slash);
 
+/**
+ * slash_require_activation() - Set activation requirement.
+ * @slash: slash context.
+ * @activate: Set to true if the terminal should require activation before use.
+ */
 void slash_require_activation(struct slash *slash, bool activate);
 
+/**
+ * slash_inhibit_exit() - Inhibit exit command.
+ * @slash: slash context.
+ * @activate: Set to true if the exit command should be inhibited.
+ */
 void slash_inhibit_exit(struct slash *slash, bool inhibit);
 
+/**
+ * slash_set_privileged() - Set current privileged level.
+ * @slash: slash context.
+ * @activate: Set to true to allow privileged commands.
+ */
 void slash_set_privileged(struct slash *slash, bool privileged);
 
 #endif /* _SLASH_H_ */
