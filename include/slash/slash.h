@@ -156,7 +156,6 @@ struct slash {
 	char *buffer;
 	size_t cursor;
 	size_t length;
-	bool escaped;
 	char last_char;
 
 	/* History */
