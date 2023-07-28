@@ -46,58 +46,132 @@
 #define SLASH_FLAG_HIDDEN	(1 << 0) /* Hidden and not shown in help or completion */
 #define SLASH_FLAG_PRIVILEGED	(1 << 1) /* Privileged and hidden until enabled with slash_set_privileged() */
 
+/* Macro used to map based on presence of optional arguments */
+#define __slash_map_macro(_0, _1, _2, _name, ...) _name
+
 #define __slash_command(_ident, _group, _name, _func, _args, _help, _flags, _context) \
 	__attribute__((section(".slash." # _ident), used, aligned(sizeof(long)))) \
-	struct slash_command _ident = {					\
-		.name  = #_name,					\
-		.parent = _group,					\
-		.func  = _func,						\
-		.args  = _args,						\
-		.help  = _help,						\
-		.flags = _flags,					\
-		.context = _context,					\
-	};
+	struct slash_command _ident = { \
+		.name  = #_name, \
+		.parent = _group, \
+		.func  = _func, \
+		.args  = _args, \
+		.help  = _help, \
+		.flags = _flags, \
+		.context = _context, \
+	}
 
 /* Top-level commands */
-#define slash_command_ex(_name, _func, _args, _help, _flags, _context)	\
-	__slash_command(slash_cmd_ ## _name,				\
-			NULL, 						\
+#define __slash_command_all(_name, _func, _args, _help, _flags, _context) \
+	__slash_command(slash_cmd_ ## _name, \
+			NULL, \
 			_name, _func, _args, _help, _flags, _context)
 
-#define slash_command(_name, _func, _args, _help) \
-	slash_command_ex(_name, _func, _args, _help, 0, NULL)
+#define __slash_command_flags(_name, _func, _args, _help, _flags) \
+	__slash_command_all(_name, _func, _args, _help, _flags, NULL)
+
+#define __slash_command_min(_name, _func, _args, _help) \
+	__slash_command_flags(_name, _func, _args, _help, 0)
+
+/**
+ * slash_command() - Declare top-level command
+ * @_name: Name of the command, without quotes.
+ * @_func: Function to execute for this command.
+ * @_help: Description string of the group.
+ * @_flags: Optional, bitwise OR of SLASH_FLAG_XXX flags.
+ * @_context: Optional, context passed to command through slash->context.
+ */
+#define slash_command(_name, _func, _args, _help, ...) \
+	__slash_map_macro(,##__VA_ARGS__, \
+			  __slash_command_all, \
+			  __slash_command_flags, \
+			  __slash_command_min)( \
+				_name, _func, _args, _help, ##__VA_ARGS__)
 
 /* Subcommand */
-#define slash_command_sub_ex(_group, _name, _func, _args, _help, _flags, _context) \
-	__slash_command(slash_cmd_ ## _group ## _ ## _name,		\
-			&(slash_cmd_ ## _group),			\
+#define __slash_command_sub_all(_group, _name, _func, _args, _help, _flags, _context) \
+	__slash_command(slash_cmd_ ## _group ## _ ## _name, \
+			&slash_cmd_ ## _group, \
 			_name, _func, _args, _help, _flags, _context)
 
-#define slash_command_sub(_group, _name, _func, _args, _help) 		\
-	slash_command_sub_ex(_group, _name, _func, _args, _help, 0, NULL)
+#define __slash_command_sub_flags(_group, _name, _func, _args, _help, _flags) \
+	__slash_command_sub_all(_group, _name, _func, _args, _help, _flags, NULL)
+
+#define __slash_command_sub_min(_group, _name, _func, _args, _help) \
+	__slash_command_sub_flags(_group, _name, _func, _args, _help, 0)
+
+/**
+ * slash_command_sub() - Declare sub-command
+ * @_group: Name of the parent group, without quotes.
+ * @_name: Name of the command, without quotes.
+ * @_func: Function to execute for this command.
+ * @_help: Description string of the group.
+ * @_flags: Optional, bitwise OR of SLASH_FLAG_XXX flags.
+ * @_context: Optional, context passed to command through slash->context.
+ */
+#define slash_command_sub(_group, _name, _func, _args, _help, ...) \
+	__slash_map_macro(,##__VA_ARGS__, \
+			  __slash_command_sub_all, \
+			  __slash_command_sub_flags, \
+			  __slash_command_sub_min)( \
+				_group, _name, _func, _args, _help, ##__VA_ARGS__)
 
 /* Subsubcommand */
-#define slash_command_subsub_ex(_group, _subgroup, _name, _func, _args, _help, _flags, _context) \
+#define __slash_command_subsub_all(_group, _subgroup, _name, _func, _args, _help, _flags, _context) \
 	__slash_command(slash_cmd_ ## _group ## _ ## _subgroup ## _ ## _name,\
-			&(slash_cmd_ ## _group ## _ ## _subgroup),	\
+			&slash_cmd_ ## _group ## _ ## _subgroup, \
 			_name, _func, _args, _help, _flags, _context)
 
-#define slash_command_subsub(_group, _subgroup, _name, _func, _args, _help) \
-	slash_command_subsub_ex(_group, _subgroup, _name, _func, _args, _help, 0, NULL)
+#define __slash_command_subsub_flags(_group, _subgroup, _name, _func, _args, _help, _flags) \
+	__slash_command_subsub_all(_group, _subgroup, _name, _func, _args, _help, _flags, NULL)
 
-/* Top-level group */
-#define slash_command_group_ex(_name, _help, _flags) \
-	slash_command_ex(_name, NULL, NULL, _help, _flags, NULL)
+#define __slash_command_subsub_min(_group, _subgroup, _name, _func, _args, _help) \
+	__slash_command_subsub_flags(_group, _subgroup, _name, _func, _args, _help, 0)
 
-#define slash_command_group(_name, _help) \
-	slash_command_group_ex(_name, _help, 0)
+/**
+ * slash_command_subsub() - Declare subsub-command
+ * @_group: Name of the grandparent group, without quotes.
+ * @_subgroup: Name of the parent group, without quotes.
+ * @_name: Name of the command, without quotes.
+ * @_func: Function to execute for this command.
+ * @_help: Description string of the group.
+ * @_flags: Optional, bitwise OR of SLASH_FLAG_XXX flags.
+ * @_context: Optional, context passed to command through slash->context.
+ */
+#define slash_command_subsub(_group, _subgroup, _name, _func, _args, _help, ...) \
+	__slash_map_macro(,##__VA_ARGS__, \
+			  __slash_command_subsub_all, \
+			  __slash_command_subsub_flags, \
+			  __slash_command_subsub_min)( \
+				_group, _subgroup, _name, _func, _args, _help, ##__VA_ARGS__)
 
-/* Subgroup */
-#define slash_command_subgroup_ex(_group, _name, _help, _flags) \
-	slash_command_sub_ex(_group, _name, NULL, NULL, _help, _flags, NULL)
+/**
+ * slash_command_group() - Declare top-level group
+ * @_name: Name of the group, without quotes.
+ * @_help: Description string of the group.
+ * @_flags: Optional, bitwise OR of SLASH_FLAG_XXX flags.
+ * @_context: Optional, context passed to command through slash->context.
+ */
+#define slash_command_group(_name, _help, ...) \
+	slash_command(_name, NULL, NULL, _help, ##__VA_ARGS__)
 
-#define slash_command_subgroup(_group, _name, _help) \
-	slash_command_sub(_group, _name, NULL, NULL, _help)
+/**
+ * slash_command_subgroup() - Declare sub-group
+ * @_group: Name of the parent group, without quotes.
+ * @_name: Name of the group, without quotes.
+ * @_help: Description string of the group.
+ * @_flags: Optional, bitwise OR of SLASH_FLAG_XXX flags.
+ * @_context: Optional, context passed to command through slash->context.
+ */
+#define slash_command_subgroup(_group, _name, _help, ...) \
+	slash_command_sub(_group, _name, NULL, NULL, _help, ##__VA_ARGS__)
+
+/* Deprecated but defined for backwards compatibility */
+#define slash_command_ex slash_command
+#define slash_command_sub_ex slash_command_sub
+#define slash_command_subsub_ex slash_command_subsub
+#define slash_command_group_ex slash_command_group
+#define slash_command_subgroup_ex slash_command_subgroup
 
 /* Command prototype */
 struct slash;
