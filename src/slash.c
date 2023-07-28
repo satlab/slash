@@ -537,7 +537,7 @@ int slash_execute(struct slash *slash, char *line)
 			if (cur->parent == command)
 				slash_command_description(slash, cur);
 		}
-		return -EINVAL;
+		return -EISDIR;
 	}
 
 	/* Build args */
