@@ -349,7 +349,7 @@ slash_command_find(struct slash *slash, char *line, size_t linelen, char **args)
 {
 	struct slash_command *cur, *command = NULL;
 	char *next = line, *token;
-	size_t tokenlen, matchlen;
+	size_t tokenlen;
 	bool found;
 
 	while ((token = slash_command_line_token(next, &tokenlen, &next))) {
@@ -364,8 +364,7 @@ slash_command_find(struct slash *slash, char *line, size_t linelen, char **args)
 				continue;
 
 			/* Skip if name does not match */
-			matchlen = slash_max(tokenlen, strlen(cur->name));
-			if (strncmp(token, cur->name, matchlen) != 0)
+			if (strncmp(token, cur->name, tokenlen) != 0)
 				continue;
 
 			/* Skip if privileged command in non-privileged mode */

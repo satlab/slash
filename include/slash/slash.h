@@ -25,7 +25,6 @@
 #define _SLASH_H_
 
 #include <stdio.h>
-#include <stddef.h>
 #include <stdbool.h>
 
 #ifdef SLASH_HAVE_TERMIOS_H
@@ -35,12 +34,6 @@
 /* Configuration */
 #define SLASH_SHOW_MAX		25	/* Maximum number of commands to list */
 #define SLASH_ARG_MAX		16	/* Maximum number of arguments, including command name */
-
-/* Helper macros */
-#define slash_max(a,b) \
-	({ __typeof__ (a) _a = (a); \
-	__typeof__ (b) _b = (b); \
-	_a > _b ? _a : _b; })
 
 /* Command flags */
 #define SLASH_FLAG_HIDDEN	(1 << 0) /* Hidden and not shown in help or completion */
