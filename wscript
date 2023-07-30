@@ -9,7 +9,7 @@ build = 'build'
 
 def options(ctx):
     if len(ctx.stack_path) < 2:
-        ctx.load('compiler_c')
+        ctx.load('compiler_c waf_unit_test')
 
     gr = ctx.add_option_group('slash options')
     gr.add_option('--slash-disable-exit', action='store_true', help='Disable exit command')
@@ -18,7 +18,7 @@ def options(ctx):
 def configure(ctx):
     # Load tool and set CFLAGS if not being recursed
     if len(ctx.stack_path) < 2:
-        ctx.load('compiler_c')
+        ctx.load('compiler_c waf_unit_test')
         ctx.env.CFLAGS = [
             '-std=gnu11', '-Os', '-gdwarf',
             '-Wall',
@@ -27,6 +27,8 @@ def configure(ctx):
             '-Wstrict-prototypes',
             '-Wmissing-prototypes',
             '-Wno-unused-parameter']
+
+        ctx.check_cfg(package='cmocka', uselib_store='cmocka', args=['--cflags', '--libs'])
 
     # Insert linker script if not explicitly disabled
     # or another linkerscript has been defined
@@ -41,11 +43,20 @@ def configure(ctx):
 
 def build(ctx):
     if len(ctx.stack_path) < 2:
-        ctx.load('compiler_c')
+        ctx.load('compiler_c waf_unit_test')
         ctx.program(
-            target   = APPNAME + 'test',
-            source   = 'test/slashtest.c',
+            target   = APPNAME + '-example',
+            source   = 'test/example.c',
             use      = APPNAME)
+
+        ctx.program(
+            features = 'test',
+            target = APPNAME + '-test',
+            source = 'test/test.c',
+            use = [APPNAME, 'cmocka'])
+
+        from waflib.Tools import waf_unit_test
+        ctx.add_post_fun(waf_unit_test.summary)
 
     ctx.objects(
         target   = APPNAME,
