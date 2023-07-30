@@ -17,7 +17,7 @@ Building
 
 The library consists of a single ``slash.c`` file and an accompanying ``slash.h`` header file. For the simplest deployment, these can be copied to the source tree of the using project. The repository also contains a ``wscript`` file for the `Waf build system <https://waf.io/>`_ such that it can be added as subproject and used for recursion.
 
-The repository contains an example application in ``test/slashtest.c`` that can be built using:
+The repository contains an example application in ``test/example.c`` that can be built using:
 
 .. code-block:: console
 
@@ -27,7 +27,7 @@ The test application can then be run using:
 
 .. code-block:: console
 
-    % ./build/slashtest 
+    % ./build/slash-example 
     slash % echo Hello, World!
     Hello, World!
 
