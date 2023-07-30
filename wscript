@@ -2,7 +2,7 @@
 # encoding: utf-8
 
 APPNAME = 'slash'
-VERSION = '0.1.0'
+VERSION = '0.2.0'
 
 top = '.'
 build = 'build'
