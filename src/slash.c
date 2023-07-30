@@ -1048,15 +1048,18 @@ static void slash_swap(struct slash *slash)
 	}
 }
 
-char *slash_readline(struct slash *slash, const char *prompt)
+void slash_set_prompt(struct slash *slash, const char *prompt)
+{
+	slash->prompt = prompt;
+	slash->prompt_length = strlen(prompt);
+	slash->prompt_print_length = slash_escaped_strlen(prompt);
+}
+
+char *slash_readline(struct slash *slash)
 {
 	char *ret = slash->buffer;
 	int c, esc[3];
 	bool done = false, escaped = false;
-
-	slash->prompt = prompt;
-	slash->prompt_length = strlen(prompt);
-	slash->prompt_print_length = slash_escaped_strlen(prompt);
 
 	/* Reset buffer */
 	slash_reset(slash);
@@ -1269,11 +1272,10 @@ void slash_inhibit_exit(struct slash *slash, bool inhibit)
 }
 
 /* Core */
-int slash_loop(struct slash *slash, const char *prompt_good, const char *prompt_bad)
+int slash_loop(struct slash *slash)
 {
 	int c, ret;
 	char *line;
-	const char *prompt = prompt_good;
 
 	if (slash_configure_term(slash) < 0)
 		return -ENOTTY;
@@ -1285,21 +1287,10 @@ int slash_loop(struct slash *slash, const char *prompt_good, const char *prompt_
 		} while (c != '\n' && c != '\r');
 	}
 
-	while ((line = slash_readline(slash, prompt))) {
-		if (!slash_line_empty(line, strlen(line))) {
-			/* Run command */
-			ret = slash_execute(slash, line);
-			if (ret == SLASH_EXIT)
-				break;
-
-			/* Update prompt if enabled */
-			if (prompt_bad && ret != SLASH_SUCCESS)
-				prompt = prompt_bad;
-			else
-				prompt = prompt_good;
-		} else {
-			prompt = prompt_good;
-		}
+	while ((line = slash_readline(slash))) {
+		ret = slash_execute(slash, line);
+		if (ret == SLASH_EXIT)
+			break;
 	}
 
 	slash_restore_term(slash);
@@ -1322,6 +1313,9 @@ int slash_init(struct slash *slash,
 #ifdef SLASH_HAVE_SELECT
 	slash->waitfunc = slash_wait_select;
 #endif
+
+	/* Set default prompt */
+	slash_set_prompt(slash, "slash> ");
 
 	/* Disable stream buffering */
 	setvbuf(slash->file_read, NULL, _IONBF, 0);

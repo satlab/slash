@@ -90,8 +90,7 @@ int main(int argc, char **argv)
 {
 	struct slash *slash;
 
-	char *prompt_good = "\033[96mslash \033[90m%\033[0m ";
-	char *prompt_bad = "\033[96mslash \033[31m!\033[0m ";
+	char *prompt = "\033[96mslash \033[90m%\033[0m ";
 
 	slash = slash_create(LINE_SIZE, HISTORY_SIZE);
 	if (!slash) {
@@ -99,7 +98,8 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-	slash_loop(slash, prompt_good, prompt_bad);
+	slash_set_prompt(slash, prompt);
+	slash_loop(slash);
 	slash_destroy(slash);
 
 	return 0;

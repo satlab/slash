@@ -344,13 +344,19 @@ int slash_refresh(struct slash *slash);
 void slash_reset(struct slash *slash);
 
 /**
+ * slash_set_prompt() - Set prompt
+ * @slash: slash context.
+ * @prompt: Prompt to print before command line.
+ */
+void slash_set_prompt(struct slash *slash, const char *prompt);
+
+/**
  * slash_readline() - Read line from user.
  * @slash: slash context.
- * @prompt: Prompt string to print before line.
  *
  * Return: Pointer to input string, NULL if the user pressed ^D.
  */
-char *slash_readline(struct slash *slash, const char *prompt);
+char *slash_readline(struct slash *slash);
 
 /**
  * slash_execute() - Execute command.
@@ -368,13 +374,11 @@ int slash_execute(struct slash *slash, char *line);
 /**
  * slash_loop() - Continuously read and execute commands.
  * @slash: slash context.
- * @prompt_good: Prompt if last command was successful.
- * @prompt_bad: Prompt if last command was not successful.
  *
  * Return: 0 if the user exited the console, or
  * -ENOTTY if the terminal could not be configured.
  */
-int slash_loop(struct slash *slash, const char *prompt_good, const char *prompt_bad);
+int slash_loop(struct slash *slash);
 
 /**
  * slash_wait_interruptible() - Wait for keypress.
