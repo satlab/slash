@@ -15,9 +15,20 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libcmocka-dev
-      - name: Configure
+          sudo python3 -m pip install meson
+          sudo python3 -m pip install ninja
+      - name: Configure Waf
         run: |
-          python3 waf distclean configure
-      - name: Build
+          python3 waf --out=build_waf distclean configure
+      - name: Build & Test Waf
         run: |
-          python3 waf build
+          python3 waf --out=build_waf build
+      - name: Configure Meson
+        run: |
+          meson setup build_meson
+      - name: Build Meson
+        run: |
+          meson compile -C build_meson
+      - name: Test Meson
+        run: |
+          meson test -C build_meson
