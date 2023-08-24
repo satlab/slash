@@ -25,7 +25,7 @@ The repository contains an example application in `test/example.c` that can be b
 The test application can then be run using:
 
 ``` console
-% ./build/slash-example 
+% ./build/slash-example
 slash % echo Hello, World!
 Hello, World!
 ```
@@ -41,7 +41,7 @@ static int cmd_hello(struct slash *slash)
 {
     if (slash->argc > 1) {
         printf("Hello, %s!\n", slash->argv[1]);
-    } else {           
+    } else {
         printf("Hello, World!\n");
     }
 
@@ -64,7 +64,7 @@ With the registry macros, slash places each command struct in its own `.slash.<c
 
 The sections can be placed in read-only memory, such as microcontroller flash. The test application uses the linker script in `linkerscript/slash.ld` as an overlay to the default Linux linker script.
 
-The slash context and the line and history buffers can either be dynamically allocated using `slash_create()` or statically allocated and initialized using `slash_init()`.  Dynamically allocated contexts can be freed using `slash_destroy()`. The context and the buffers must resize in writable memory.
+The slash context and the line and history buffers can either be dynamically allocated using `slash_create()` or statically allocated and initialized using `slash_init()`.  Dynamically allocated contexts can be freed using `slash_destroy()`. The context and the buffers must reside in writable memory.
 
 ## License
 

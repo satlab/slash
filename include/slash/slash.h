@@ -2,17 +2,17 @@
  * The MIT License (MIT)
  *
  * Copyright (c) 2014-2023 Satlab A/S <satlab@satlab.com>
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
  * the Software without restriction, including without limitation the rights to
  * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
  * the Software, and to permit persons to whom the Software is furnished to do so,
  * subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
  * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
@@ -293,8 +293,8 @@ struct slash {
  * @line_size: Number of bytes to allocate for the line buffer.
  * @history_size: Number of bytes to allocate for the history buffer.
  *
- * This command dynamically allocates a new slash context and buffers for the
- * command line and history. The allocated memory should be freed using
+ * This command dynamically allocates and initializes a new slash context and buffers
+ * for the command line and history. The allocated memory should be freed using
  * slash_destroy() when no longer needed.
  *
  * Return: a pointer to a new slash context, or NULL if the context could not
@@ -306,8 +306,8 @@ struct slash *slash_create(size_t line_size, size_t history_size);
  * slash_destroy() - Free slash context and buffers.
  * @slash: slash context to free.
  *
- * This command frees a slash context and buffers that was previously been
- * allocated with slash_destroy().
+ * This command frees a slash context and buffers that was previously allocated
+ * with slash_create().
  */
 void slash_destroy(struct slash *slash);
 
@@ -319,8 +319,7 @@ void slash_destroy(struct slash *slash);
  * @history: Pointer to history buffer.
  * @history_size: Size in bytes of the history buffer.
  *
- * This command frees a slash context and buffers that was previously been
- * allocated with slash_destroy().
+ * This command initializes a slash context and buffers.
  *
  * Return: 0 if the initialization was successful, negative error value otherwise.
  */
