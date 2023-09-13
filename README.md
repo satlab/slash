@@ -1,5 +1,6 @@
 # Slash
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 ![build workflow](https://github.com/satlab/slash/actions/workflows/build.yml/badge.svg)
 
 slash (originally from *SatLAb SHell*) is a small line editor and command parser library for embedded systems. It is especially suited for serial debugging interfaces on memory constrained systems.
