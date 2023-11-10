@@ -367,6 +367,10 @@ slash_command_find(struct slash *slash, char *line, size_t linelen, char **args)
 			if (strncmp(token, cur->name, tokenlen) != 0)
 				continue;
 
+			/* Ensure entire command name matches */
+			if (strlen(cur->name) != tokenlen)
+				continue;
+
 			/* Skip if privileged command in non-privileged mode */
 			if (!slash->privileged &&
 			    (cur->flags & SLASH_FLAG_PRIVILEGED))
