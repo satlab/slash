@@ -128,6 +128,17 @@ static void slash_test_context_command(void **state)
 	assert_int_equal(ret, 0);
 }
 
+static void slash_test_partial(void **state)
+{
+	struct slash *slash = *state;
+
+	int ret;
+	char *cmd = "e"; /* Partial match on builtin echo */
+
+	ret = slash_execute(slash, cmd);
+	assert_int_equal(ret, -ENOENT);
+}
+
 static int setup(void **state)
 {
 	struct slash *slash = slash_create(LINE_SIZE, HISTORY_SIZE);
@@ -152,6 +163,7 @@ int main(void)
 		cmocka_unit_test(slash_test_sub_command),
 		cmocka_unit_test(slash_test_privileged_command),
 		cmocka_unit_test(slash_test_context_command),
+		cmocka_unit_test(slash_test_partial),
 	};
 
 	return cmocka_run_group_tests(tests, setup, teardown);
