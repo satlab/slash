@@ -874,14 +874,14 @@ static void slash_history_add(struct slash *slash, char *line)
 		slash_history_push(slash, line, strlen(line) + 1);
 }
 
-static void slash_history_next(struct slash *slash)
+static bool slash_history_next(struct slash *slash)
 {
 	char *src;
 	size_t srclen;
 
 	src = slash_history_search_forward(slash, slash->history_cursor, &srclen);
 	if (!src)
-		return;
+		return false;
 
 	slash->history_depth--;
 	slash_history_copy(slash, slash->buffer, src, srclen);
@@ -892,16 +892,18 @@ static void slash_history_next(struct slash *slash)
 	/* Rewind if use to store buffer temporarily */
 	if (!slash->history_depth && slash->history_cursor != slash->history_tail)
 		slash_history_rewind(slash, slash->history_rewind_length);
+
+	return true;
 }
 
-static void slash_history_previous(struct slash *slash)
+static bool slash_history_previous(struct slash *slash)
 {
 	char *src;
 	size_t srclen, buflen;
 
 	src = slash_history_search_back(slash, slash->history_cursor, &srclen);
 	if (!src)
-		return;
+		return false;
 
 	/* Store current buffer temporarily */
 	buflen = strlen(slash->buffer);
@@ -915,6 +917,8 @@ static void slash_history_previous(struct slash *slash)
 	slash->buffer[srclen] = '\0';
 	slash->history_cursor = src;
 	slash->cursor = slash->length = srclen;
+
+	return true;
 }
 
 /* Line editing */
@@ -977,12 +981,14 @@ void slash_reset(struct slash *slash)
 
 static void slash_arrow_up(struct slash *slash)
 {
-	slash_history_previous(slash);
+	if (!slash_history_previous(slash))
+		slash_bell(slash);
 }
 
 static void slash_arrow_down(struct slash *slash)
 {
-	slash_history_next(slash);
+	if (!slash_history_next(slash))
+		slash_bell(slash);
 }
 
 static void slash_arrow_right(struct slash *slash)
