@@ -121,6 +121,23 @@
 #define __slash_command_subsub_min(_group, _subgroup, _name, _func, _args, _help) \
 	__slash_command_subsub_flags(_group, _subgroup, _name, _func, _args, _help, 0)
 
+/* Subsubsubcommand */
+#define __slash_command_subsubsub_all(_group, _subgroup, _subsubgroup, _name, \
+				      _func, _args, _help, _flags, _context) \
+	__slash_command(slash_cmd_ ## _group ## _ ## _subgroup ## _ ## _subsubgroup ## _ ## _name,\
+			&slash_cmd_ ## _group ## _ ## _subgroup ## _ ## _subsubgroup, \
+			_name, _func, _args, _help, _flags, _context)
+
+#define __slash_command_subsubsub_flags(_group, _subgroup, _subsubgroup, _name, \
+					_func, _args, _help, _flags) \
+	__slash_command_subsubsub_all(_group, _subgroup, _subsubgroup, _name, \
+				      _func, _args, _help, _flags, NULL)
+
+#define __slash_command_subsubsub_min(_group, _subgroup, _subsubgroup, _name, \
+				      _func, _args, _help) \
+	__slash_command_subsubsub_flags(_group, _subgroup, _subsubgroup, _name, \
+					_func, _args, _help, 0)
+
 /**
  * slash_command_subsub() - Declare subsub-command
  * @_group: Name of the grandparent group, without quotes.
@@ -137,6 +154,24 @@
 			  __slash_command_subsub_flags, \
 			  __slash_command_subsub_min)( \
 				_group, _subgroup, _name, _func, _args, _help, ##__VA_ARGS__)
+
+/**
+ * slash_command_subsubsub() - Declare subsubsub-command
+ * @_group: Name of the great-grandparent group, without quotes.
+ * @_subgroup: Name of the grandparent group, without quotes.
+ * @_subsubgroup: Name of the parent group, without quotes.
+ * @_name: Name of the command, without quotes.
+ * @_func: Function to execute for this command.
+ * @_help: Description string of the group.
+ * @_flags: Optional, bitwise OR of SLASH_FLAG_XXX flags.
+ * @_context: Optional, context passed to command through slash->context.
+ */
+#define slash_command_subsubsub(_group, _subgroup, _subsubgroup, _name, _func, _args, _help, ...) \
+	__slash_map_macro(,##__VA_ARGS__, \
+			  __slash_command_subsubsub_all, \
+			  __slash_command_subsubsub_flags, \
+			  __slash_command_subsubsub_min)( \
+				_group, _subgroup, _subsubgroup, _name, _func, _args, _help, ##__VA_ARGS__)
 
 /**
  * slash_command_group() - Declare top-level group
@@ -158,6 +193,18 @@
  */
 #define slash_command_subgroup(_group, _name, _help, ...) \
 	slash_command_sub(_group, _name, NULL, NULL, _help, ##__VA_ARGS__)
+
+/**
+ * slash_command_subsubgroup() - Declare subsub-group
+ * @_group: Name of the grandparent group, without quotes.
+ * @_subgroup: Name of the parent group, without quotes.
+ * @_name: Name of the group, without quotes.
+ * @_help: Description string of the group.
+ * @_flags: Optional, bitwise OR of SLASH_FLAG_XXX flags.
+ * @_context: Optional, context passed to command through slash->context.
+ */
+#define slash_command_subsubgroup(_group, _subgroup, _name, _help, ...) \
+	slash_command_subsub(_group, _subgroup, _name, NULL, NULL, _help, ##__VA_ARGS__)
 
 /* Deprecated but defined for backwards compatibility */
 #define slash_command_ex slash_command
