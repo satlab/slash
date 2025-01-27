@@ -57,9 +57,37 @@ slash_command(test, cmd_test, NULL, NULL);
 
 static int cmd_test_sub(struct slash *slash)
 {
+	if (slash->argc != 1)
+		return SLASH_EUSAGE;
+
 	return SLASH_SUCCESS;
 }
 slash_command_sub(test, sub, cmd_test_sub, NULL, NULL);
+
+static int cmd_test_subsub(struct slash *slash)
+{
+	if (slash->argc != 1)
+		return SLASH_EUSAGE;
+
+	return SLASH_SUCCESS;
+}
+slash_command_subsub(test, sub, subsub, cmd_test_subsub, NULL, NULL);
+
+static int cmd_test_subsubsub(struct slash *slash)
+{
+	if (slash->argc != 1)
+		return SLASH_EUSAGE;
+
+	return SLASH_SUCCESS;
+}
+slash_command_subsubsub(test, sub, subsub, subsubsub,
+			cmd_test_subsubsub, NULL, NULL);
+
+slash_command_group(group, NULL);
+slash_command_subgroup(group, subgroup, NULL);
+slash_command_subsubgroup(group, subgroup, subsubgroup, NULL);
+slash_command_subsubsub(group, subgroup, subsubgroup, subsubsub,
+			cmd_test_subsubsub, NULL, NULL);
 
 static int cmd_privileged(struct slash *slash)
 {
@@ -95,6 +123,39 @@ static void slash_test_sub_command(void **state)
 
 	int ret;
 	char *cmd = "test sub";
+
+	ret = slash_execute(slash, cmd);
+	assert_int_equal(ret, 0);
+}
+
+static void slash_test_subsub_command(void **state)
+{
+	struct slash *slash = *state;
+
+	int ret;
+	char *cmd = "test sub subsub";
+
+	ret = slash_execute(slash, cmd);
+	assert_int_equal(ret, 0);
+}
+
+static void slash_test_subsubsub_command(void **state)
+{
+	struct slash *slash = *state;
+
+	int ret;
+	char *cmd = "test sub subsub subsubsub";
+
+	ret = slash_execute(slash, cmd);
+	assert_int_equal(ret, 0);
+}
+
+static void slash_test_subsubsub_command_in_group(void **state)
+{
+	struct slash *slash = *state;
+
+	int ret;
+	char *cmd = "group subgroup subsubgroup subsubsub";
 
 	ret = slash_execute(slash, cmd);
 	assert_int_equal(ret, 0);
@@ -161,6 +222,9 @@ int main(void)
 	const struct CMUnitTest tests[] = {
 		cmocka_unit_test(slash_test_command),
 		cmocka_unit_test(slash_test_sub_command),
+		cmocka_unit_test(slash_test_subsub_command),
+		cmocka_unit_test(slash_test_subsubsub_command),
+		cmocka_unit_test(slash_test_subsubsub_command_in_group),
 		cmocka_unit_test(slash_test_privileged_command),
 		cmocka_unit_test(slash_test_context_command),
 		cmocka_unit_test(slash_test_partial),
