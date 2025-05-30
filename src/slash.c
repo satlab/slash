@@ -1032,17 +1032,18 @@ static void slash_backspace(struct slash *slash)
 
 static void slash_delete_word(struct slash *slash)
 {
-	int old_cursor = slash->cursor, erased;
+	size_t old_cursor = slash->cursor;
 
 	while (slash->cursor > 0 && slash->buffer[slash->cursor-1] == ' ')
 		slash->cursor--;
 	while (slash->cursor > 0 && slash->buffer[slash->cursor-1] != ' ')
 		slash->cursor--;
 
-	erased = old_cursor - slash->cursor;
-
-	memmove(slash->buffer + slash->cursor, slash->buffer + old_cursor, erased);
-	slash->length -= erased;
+	slash->length -= old_cursor - slash->cursor;
+	memmove(&slash->buffer[slash->cursor],
+		&slash->buffer[old_cursor],
+		slash->length - slash->cursor);
+	slash->buffer[slash->length] = '\0';
 }
 
 static void slash_swap(struct slash *slash)
