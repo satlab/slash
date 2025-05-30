@@ -1008,7 +1008,8 @@ static void slash_delete(struct slash *slash)
 	if (slash->cursor < slash->length) {
 		slash->length--;
 		memmove(&slash->buffer[slash->cursor],
-			&slash->buffer[slash->cursor + 1], slash->length - slash->cursor);
+			&slash->buffer[slash->cursor + 1],
+			slash->length - slash->cursor);
 		slash->buffer[slash->length] = '\0';
 	}
 }
@@ -1025,7 +1026,8 @@ static void slash_backspace(struct slash *slash)
 		slash->cursor--;
 		slash->length--;
 		memmove(&slash->buffer[slash->cursor],
-			&slash->buffer[slash->cursor + 1], slash->length - slash->cursor);
+			&slash->buffer[slash->cursor + 1],
+			slash->length - slash->cursor);
 		slash->buffer[slash->length] = '\0';
 	}
 }
