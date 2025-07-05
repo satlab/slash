@@ -267,10 +267,13 @@ struct slash_command {
  * @line_size: Size in bytes of the line buffer.
  * @prompt: Current prompt string.
  * @prompt_length: Length in bytes of the prompt string.
- * @prompt_print_length: Length in printable characters of the prompt string.
  * @buffer: Pointer to line buffer memory.
  * @cursor: Current index of cursor in line buffer.
+ * @cursor_screen: Current index of cursor in line buffer on screen.
  * @length: Current amount of used bytes in line buffer.
+ * @length_screen: Current amount of used bytes in line buffer on screen.
+ * @refresh_full: Force a full screen refresh including prompt.
+ * @refresh_buffer: Force a screen refresh of buffer.
  * @last_char: Last input character.
  * @history_size: Size in byte of the history buffer.
  * @history_depth: Number of history entries browsed back.
@@ -306,10 +309,13 @@ struct slash {
 	size_t line_size;
 	const char *prompt;
 	size_t prompt_length;
-	size_t prompt_print_length;
 	char *buffer;
 	size_t cursor;
+	size_t cursor_screen;
 	size_t length;
+	size_t length_screen;
+	bool refresh_full;
+	bool refresh_buffer;
 	char last_char;
 
 	/* History */
