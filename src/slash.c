@@ -113,26 +113,6 @@ int slash_getopt(struct slash *slash, const char *opts)
 }
 
 /* Terminal handling */
-static size_t slash_escaped_strlen(const char *s)
-{
-	int len = 0;
-	bool escaped = false;
-
-	while (*s) {
-		if (escaped) {
-			if (*s == 'm')
-				escaped = false;
-		} else if (*s == ESC) {
-			escaped = true;
-		} else {
-			len++;
-		}
-		s++;
-	}
-
-	return len;
-}
-
 static int slash_rawmode_enable(struct slash *slash)
 {
 #ifdef SLASH_HAVE_TERMIOS_H
@@ -697,6 +677,7 @@ static void slash_complete(struct slash *slash)
 		if (command) {
 			slash_printf(slash, "\n");
 			slash_command_usage(slash, command);
+			slash->refresh_full = true;
 		} else {
 			slash_bell(slash);
 		}
@@ -717,6 +698,7 @@ static void slash_complete(struct slash *slash)
 				slash_command_description(slash, cur);
 			}
 		}
+		slash->refresh_full = true;
 	}
 }
 
@@ -888,6 +870,7 @@ static bool slash_history_next(struct slash *slash)
 	slash->buffer[srclen] = '\0';
 	slash->history_cursor = src;
 	slash->cursor = slash->length = srclen;
+	slash->refresh_buffer = true;
 
 	/* Rewind if use to store buffer temporarily */
 	if (!slash->history_depth && slash->history_cursor != slash->history_tail)
@@ -917,6 +900,7 @@ static bool slash_history_previous(struct slash *slash)
 	slash->buffer[srclen] = '\0';
 	slash->history_cursor = src;
 	slash->cursor = slash->length = srclen;
+	slash->refresh_buffer = true;
 
 	return true;
 }
@@ -924,26 +908,56 @@ static bool slash_history_previous(struct slash *slash)
 /* Line editing */
 int slash_refresh(struct slash *slash)
 {
-	char esc[16];
+	const char *esc = ESCAPE("K");
 
-	/* Ensure line is zero terminated */
-	slash->buffer[slash->length] = '\0';
+	if (slash->refresh_full) {
+		slash_putchar(slash, '\r');
+		if (slash_write(slash, slash->prompt, slash->prompt_length) < 0)
+			return -1;
+		if (slash_write(slash, esc, strlen(esc)) < 0)
+			return -1;
+		slash->cursor_screen = 0;
+		slash->length_screen = 0;
+		slash->refresh_full = false;
+	}
 
-	/* Move cursor to left edge */
-	if (slash_putchar(slash, '\r') < 0)
-		return -1;
+	if (slash->refresh_buffer) {
+		while (slash->cursor_screen > 0) {
+			slash_putchar(slash, '\b');
+			slash->cursor_screen--;
+		}
+		slash->refresh_buffer = false;
+	}
 
-	/* Write the prompt and the current buffer content */
-	if (slash_write(slash, slash->prompt, slash->prompt_length) < 0)
-		return -1;
-	if (slash_write(slash, slash->buffer, slash->length) < 0)
-		return -1;
+	while (slash->cursor_screen != slash->cursor) {
+		if (slash->cursor_screen < slash->cursor) {
+			slash_putchar(slash, slash->buffer[slash->cursor_screen]);
+			slash->cursor_screen++;
+		} else if (slash->cursor_screen > slash->cursor) {
+			slash_putchar(slash, '\b');
+			slash->cursor_screen--;
+		}
+	}
 
-	/* Erase to the right and move cursor to original position. */
-	snprintf(esc, sizeof(esc), ESCAPE("K") "\r" ESCAPE("%uC"),
-		(unsigned int)(slash->cursor + slash->prompt_print_length));
-	if (slash_write(slash, esc, strlen(esc)) < 0)
-		return -1;
+	if (slash->length_screen != slash->length) {
+		if (slash_write(slash,
+				&slash->buffer[slash->cursor],
+				slash->length - slash->cursor) < 0)
+			return -1;
+		slash->cursor_screen = slash->length;
+
+		if (slash->length_screen > slash->length) {
+			if (slash_write(slash, esc, strlen(esc)) < 0)
+				return -1;
+		}
+
+		while (slash->cursor_screen > slash->cursor) {
+			slash_putchar(slash, '\b');
+			slash->cursor_screen--;
+		}
+
+		slash->length_screen = slash->length;
+	}
 
 	return 0;
 }
@@ -953,23 +967,13 @@ static void slash_insert(struct slash *slash, int c)
 	if (slash->length + 1 > slash->line_size)
 		return;
 
-	/* Fast path if we're adding a character to the end of the line */
-	if (slash->cursor == slash->length) {
-		slash->buffer[slash->cursor] = c;
-		slash->cursor++;
-		slash->length++;
-		slash->buffer[slash->length] = '\0';
-		slash_putchar(slash, slash->buffer[slash->cursor - 1]);
-	} else {
-		memmove(&slash->buffer[slash->cursor + 1],
-			&slash->buffer[slash->cursor],
-			slash->length - slash->cursor);
-		slash->buffer[slash->cursor] = c;
-		slash->cursor++;
-		slash->length++;
-		slash->buffer[slash->length] = '\0';
-		slash_refresh(slash);
-	}
+	memmove(&slash->buffer[slash->cursor + 1],
+		&slash->buffer[slash->cursor],
+		slash->length - slash->cursor);
+	slash->buffer[slash->cursor] = c;
+	slash->cursor++;
+	slash->length++;
+	slash->buffer[slash->length] = '\0';
 }
 
 void slash_reset(struct slash *slash)
@@ -977,6 +981,7 @@ void slash_reset(struct slash *slash)
 	slash->buffer[0] = '\0';
 	slash->length = 0;
 	slash->cursor = 0;
+	slash->refresh_full = true;
 }
 
 static void slash_arrow_up(struct slash *slash)
@@ -1018,6 +1023,7 @@ void slash_clear_screen(struct slash *slash)
 {
 	const char *esc = ESCAPE("H") ESCAPE("2J");
 	slash_write(slash, esc, strlen(esc));
+	slash->refresh_full = true;
 }
 
 static void slash_backspace(struct slash *slash)
@@ -1065,7 +1071,6 @@ void slash_set_prompt(struct slash *slash, const char *prompt)
 {
 	slash->prompt = prompt;
 	slash->prompt_length = strlen(prompt);
-	slash->prompt_print_length = slash_escaped_strlen(prompt);
 }
 
 char *slash_readline(struct slash *slash)
@@ -1108,8 +1113,6 @@ char *slash_readline(struct slash *slash)
 					slash->cursor = slash->length;
 			}
 			escaped = false;
-
-			slash_refresh(slash);
 		} else if (iscntrl(c)) {
 			switch (c) {
 			case CONTROL('A'):
@@ -1141,6 +1144,7 @@ char *slash_readline(struct slash *slash)
 				break;
 			case CONTROL('K'):
 				slash->length = slash->cursor;
+				slash->buffer[slash->length] = '\0';
 				break;
 			case CONTROL('L'):
 				slash_clear_screen(slash);
@@ -1157,6 +1161,7 @@ char *slash_readline(struct slash *slash)
 			case CONTROL('U'):
 				slash->cursor = 0;
 				slash->length = 0;
+				slash->buffer[0] = '\0';
 				break;
 			case CONTROL('W'):
 				slash_delete_word(slash);
@@ -1179,12 +1184,12 @@ char *slash_readline(struct slash *slash)
 				/* Unknown control */
 				break;
 			}
-
-			slash_refresh(slash);
 		} else if (isprint(c)) {
 			/* Add to buffer */
 			slash_insert(slash, c);
 		}
+
+		slash_refresh(slash);
 
 		slash->last_char = c;
 	}
