@@ -911,6 +911,18 @@ static bool slash_history_previous(struct slash *slash)
 }
 
 /* Line editing */
+static int slash_cursor_back(struct slash *slash, size_t n)
+{
+	/* If we need to move more than 3 colums, CUB uses fewer bytes */
+	if (n > 3) {
+		slash_printf(slash, ESCAPE("%zuD"), n);
+	} else {
+		while (n--)
+			slash_putchar(slash, '\b');
+	}
+
+	return 0;
+}
 int slash_refresh(struct slash *slash)
 {
 	const char *esc = ESCAPE("K");
@@ -927,21 +939,20 @@ int slash_refresh(struct slash *slash)
 	}
 
 	if (slash->refresh_buffer) {
-		while (slash->cursor_screen > 0) {
-			slash_putchar(slash, '\b');
-			slash->cursor_screen--;
-		}
+		slash_cursor_back(slash, slash->cursor_screen);
+		slash->cursor_screen = 0;
 		slash->refresh_buffer = false;
 	}
 
-	while (slash->cursor_screen != slash->cursor) {
-		if (slash->cursor_screen < slash->cursor) {
-			slash_putchar(slash, slash->buffer[slash->cursor_screen]);
-			slash->cursor_screen++;
-		} else if (slash->cursor_screen > slash->cursor) {
-			slash_putchar(slash, '\b');
-			slash->cursor_screen--;
-		}
+	while (slash->cursor_screen < slash->cursor) {
+		slash_putchar(slash, slash->buffer[slash->cursor_screen]);
+		slash->cursor_screen++;
+	}
+
+	if (slash->cursor_screen > slash->cursor) {
+		slash_cursor_back(slash,
+				  slash->cursor_screen - slash->cursor);
+		slash->cursor_screen = slash->cursor;
 	}
 
 	if (slash->length_screen != slash->length) {
@@ -956,9 +967,10 @@ int slash_refresh(struct slash *slash)
 				return -1;
 		}
 
-		while (slash->cursor_screen > slash->cursor) {
-			slash_putchar(slash, '\b');
-			slash->cursor_screen--;
+		if (slash->cursor_screen > slash->cursor) {
+			slash_cursor_back(slash,
+					  slash->cursor_screen - slash->cursor);
+			slash->cursor_screen = slash->cursor;
 		}
 
 		slash->length_screen = slash->length;
