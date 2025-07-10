@@ -173,6 +173,11 @@ static int slash_write(struct slash *slash, const char *buf, size_t count)
 	return fwrite(buf, 1, count, slash->file_write) == count ? (int)count : -1;
 }
 
+static int slash_write_flush(struct slash *slash)
+{
+	return fflush(slash->file_write) == 0 ? 0 : -1;
+}
+
 static int slash_read(struct slash *slash, void *buf, size_t count)
 {
 	return fread(buf, 1, count, slash->file_read) == count ? (int)count : -1;
@@ -912,9 +917,9 @@ int slash_refresh(struct slash *slash)
 
 	if (slash->refresh_full) {
 		slash_putchar(slash, '\r');
-		if (slash_write(slash, slash->prompt, slash->prompt_length) < 0)
-			return -1;
 		if (slash_write(slash, esc, strlen(esc)) < 0)
+			return -1;
+		if (slash_write(slash, slash->prompt, slash->prompt_length) < 0)
 			return -1;
 		slash->cursor_screen = 0;
 		slash->length_screen = 0;
@@ -959,7 +964,7 @@ int slash_refresh(struct slash *slash)
 		slash->length_screen = slash->length;
 	}
 
-	return 0;
+	return slash_write_flush(slash);
 }
 
 static void slash_insert(struct slash *slash, int c)
@@ -1334,10 +1339,6 @@ int slash_init(struct slash *slash,
 
 	/* Set default prompt */
 	slash_set_prompt(slash, "slash> ");
-
-	/* Disable stream buffering */
-	setvbuf(slash->file_read, NULL, _IONBF, 0);
-	setvbuf(slash->file_write, NULL, _IONBF, 0);
 
 	/* Initialize line buffer */
 	slash->buffer = line;
