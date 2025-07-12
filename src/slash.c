@@ -198,6 +198,19 @@ static int slash_getchar(struct slash *slash)
 	return c;
 }
 
+static void slash_mark_changed(struct slash *slash, size_t start, size_t end)
+{
+	if (slash->change_start == slash->change_end) {
+		slash->change_start = start;
+		slash->change_end = end;
+	} else {
+		if (start < slash->change_start)
+			slash->change_start = start;
+		if (end > slash->change_end)
+			slash->change_end = end;
+	}
+}
+
 #ifdef SLASH_HAVE_SELECT
 static int slash_wait_select(struct slash *slash, unsigned int ms)
 {
@@ -622,7 +635,9 @@ static void slash_set_completion(struct slash *slash,
 	complete[len] = '\0';
 	if (space)
 		strncat(complete, " ", slash->line_size - 1);
-	slash->cursor = slash->length = strlen(slash->buffer);
+	slash->length = strlen(slash->buffer);
+	slash_mark_changed(slash, slash->cursor, slash->length);
+	slash->cursor = slash->length;
 }
 
 static bool slash_complete_matches(struct slash *slash,
@@ -875,7 +890,7 @@ static bool slash_history_next(struct slash *slash)
 	slash->buffer[srclen] = '\0';
 	slash->history_cursor = src;
 	slash->cursor = slash->length = srclen;
-	slash->refresh_buffer = true;
+	slash_mark_changed(slash, 0, slash->length);
 
 	/* Rewind if use to store buffer temporarily */
 	if (!slash->history_depth && slash->history_cursor != slash->history_tail)
@@ -905,28 +920,64 @@ static bool slash_history_previous(struct slash *slash)
 	slash->buffer[srclen] = '\0';
 	slash->history_cursor = src;
 	slash->cursor = slash->length = srclen;
-	slash->refresh_buffer = true;
+	slash_mark_changed(slash, 0, slash->length);
 
 	return true;
 }
 
 /* Line editing */
-static int slash_cursor_back(struct slash *slash, size_t n)
+static int slash_screen_cursor_back(struct slash *slash, size_t n)
 {
 	/* If we need to move more than 3 colums, CUB uses fewer bytes */
 	if (n > 3) {
 		slash_printf(slash, ESCAPE("%zuD"), n);
+		slash->cursor_screen -= n;
 	} else {
-		while (n--)
+		while (n--) {
 			slash_putchar(slash, '\b');
+			slash->cursor_screen--;
+		}
 	}
 
 	return 0;
 }
+
+static int slash_screen_cursor_forward(struct slash *slash, size_t n)
+{
+	/* If we need to move more than 3 colums, CUF uses fewer bytes */
+	if (n > 3) {
+		slash_printf(slash, ESCAPE("%zuC"), n);
+		slash->cursor_screen += n;
+	} else {
+		while (n--) {
+			slash_putchar(slash, slash->buffer[slash->cursor_screen]);
+			slash->cursor_screen++;
+		}
+	}
+
+	return 0;
+}
+
+static int slash_screen_cursor_to_column(struct slash *slash, size_t col)
+{
+	size_t diff;
+
+	if (col > slash->cursor_screen) {
+		diff = col - slash->cursor_screen;
+		return slash_screen_cursor_forward(slash, diff);
+	} else if (col < slash->cursor_screen) {
+		diff = slash->cursor_screen - col;
+		return slash_screen_cursor_back(slash, diff);
+	}
+
+	return 0;
+}
+
 int slash_refresh(struct slash *slash)
 {
 	const char *esc = ESCAPE("K");
 
+	/* Full refresh with prompt */
 	if (slash->refresh_full) {
 		slash_putchar(slash, '\r');
 		if (slash_write(slash, esc, strlen(esc)) < 0)
@@ -935,61 +986,64 @@ int slash_refresh(struct slash *slash)
 			return -1;
 		slash->cursor_screen = 0;
 		slash->length_screen = 0;
+		slash->change_start = 0;
+		slash->change_end = slash->length;
 		slash->refresh_full = false;
 	}
 
-	if (slash->refresh_buffer) {
-		slash_cursor_back(slash, slash->cursor_screen);
-		slash->cursor_screen = 0;
-		slash->refresh_buffer = false;
-	}
-
-	while (slash->cursor_screen < slash->cursor) {
-		slash_putchar(slash, slash->buffer[slash->cursor_screen]);
-		slash->cursor_screen++;
-	}
-
-	if (slash->cursor_screen > slash->cursor) {
-		slash_cursor_back(slash,
-				  slash->cursor_screen - slash->cursor);
-		slash->cursor_screen = slash->cursor;
-	}
-
-	if (slash->length_screen != slash->length) {
-		if (slash_write(slash,
-				&slash->buffer[slash->cursor],
-				slash->length - slash->cursor) < 0)
+	/* Buffer contents have changed */
+	if (slash->change_start != slash->change_end) {
+		if (slash_screen_cursor_to_column(slash, slash->change_start) < 0)
 			return -1;
-		slash->cursor_screen = slash->length;
-
-		if (slash->length_screen > slash->length) {
-			if (slash_write(slash, esc, strlen(esc)) < 0)
-				return -1;
-		}
-
-		if (slash->cursor_screen > slash->cursor) {
-			slash_cursor_back(slash,
-					  slash->cursor_screen - slash->cursor);
-			slash->cursor_screen = slash->cursor;
-		}
-
-		slash->length_screen = slash->length;
+		if (slash_write(slash,
+				&slash->buffer[slash->change_start],
+				slash->change_end - slash->change_start) < 0)
+			return -1;
+		slash->cursor_screen = slash->change_end;
+		slash->change_start = slash->change_end = 0;
 	}
+
+	/* If screen contents were truncated, erase remainder */
+	if (slash->length_screen > slash->length) {
+		if (slash_screen_cursor_to_column(slash, slash->length) < 0)
+			return -1;
+		if (slash_write(slash, esc, strlen(esc)) < 0)
+			return -1;
+	}
+	slash->length_screen = slash->length;
+
+	/* Restore screen cursor position */
+	if (slash_screen_cursor_to_column(slash, slash->cursor) < 0)
+		return -1;
 
 	return slash_write_flush(slash);
 }
 
 static void slash_insert(struct slash *slash, int c)
 {
-	if (slash->length + 1 > slash->line_size)
+	if (slash->length >= slash->line_size)
 		return;
 
 	memmove(&slash->buffer[slash->cursor + 1],
 		&slash->buffer[slash->cursor],
 		slash->length - slash->cursor);
 	slash->buffer[slash->cursor] = c;
-	slash->cursor++;
 	slash->length++;
+	slash_mark_changed(slash, slash->cursor, slash->length);
+	slash->cursor++;
+	slash->buffer[slash->length] = '\0';
+}
+
+static void slash_delete(struct slash *slash)
+{
+	if (slash->cursor >= slash->length)
+		return;
+
+	slash->length--;
+	memmove(&slash->buffer[slash->cursor],
+		&slash->buffer[slash->cursor + 1],
+		slash->length - slash->cursor);
+	slash_mark_changed(slash, slash->cursor, slash->length);
 	slash->buffer[slash->length] = '\0';
 }
 
@@ -998,6 +1052,8 @@ void slash_reset(struct slash *slash)
 	slash->buffer[0] = '\0';
 	slash->length = 0;
 	slash->cursor = 0;
+	slash->change_start = 0;
+	slash->change_end = 0;
 	slash->refresh_full = true;
 }
 
@@ -1025,17 +1081,6 @@ static void slash_arrow_left(struct slash *slash)
 		slash->cursor--;
 }
 
-static void slash_delete(struct slash *slash)
-{
-	if (slash->cursor < slash->length) {
-		slash->length--;
-		memmove(&slash->buffer[slash->cursor],
-			&slash->buffer[slash->cursor + 1],
-			slash->length - slash->cursor);
-		slash->buffer[slash->length] = '\0';
-	}
-}
-
 void slash_clear_screen(struct slash *slash)
 {
 	const char *esc = ESCAPE("H") ESCAPE("2J");
@@ -1045,14 +1090,16 @@ void slash_clear_screen(struct slash *slash)
 
 static void slash_backspace(struct slash *slash)
 {
-	if (slash->cursor > 0) {
-		slash->cursor--;
-		slash->length--;
-		memmove(&slash->buffer[slash->cursor],
-			&slash->buffer[slash->cursor + 1],
-			slash->length - slash->cursor);
-		slash->buffer[slash->length] = '\0';
-	}
+	if (slash->cursor == 0)
+		return;
+
+	slash->cursor--;
+	slash->length--;
+	memmove(&slash->buffer[slash->cursor],
+		&slash->buffer[slash->cursor + 1],
+		slash->length - slash->cursor);
+	slash_mark_changed(slash, slash->cursor, slash->length);
+	slash->buffer[slash->length] = '\0';
 }
 
 static void slash_delete_word(struct slash *slash)
@@ -1068,6 +1115,7 @@ static void slash_delete_word(struct slash *slash)
 	memmove(&slash->buffer[slash->cursor],
 		&slash->buffer[old_cursor],
 		slash->length - slash->cursor);
+	slash_mark_changed(slash, slash->cursor, slash->length);
 	slash->buffer[slash->length] = '\0';
 }
 

@@ -272,8 +272,9 @@ struct slash_command {
  * @cursor_screen: Current index of cursor in line buffer on screen.
  * @length: Current amount of used bytes in line buffer.
  * @length_screen: Current amount of used bytes in line buffer on screen.
+ * @change_start: Index of first byte in line buffer that needs screen refresh.
+ * @change_end: Index of first byte in line buffer that does not need screen refresh.
  * @refresh_full: Force a full screen refresh including prompt.
- * @refresh_buffer: Force a screen refresh of buffer.
  * @last_char: Last input character.
  * @history_size: Size in byte of the history buffer.
  * @history_depth: Number of history entries browsed back.
@@ -314,8 +315,9 @@ struct slash {
 	size_t cursor_screen;
 	size_t length;
 	size_t length_screen;
+	size_t change_start;
+	size_t change_end;
 	bool refresh_full;
-	bool refresh_buffer;
 	char last_char;
 
 	/* History */
