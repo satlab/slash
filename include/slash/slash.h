@@ -276,6 +276,8 @@ struct slash_command {
  * @change_end: Index of first byte in line buffer that does not need screen refresh.
  * @refresh_full: Force a full screen refresh including prompt.
  * @last_char: Last input character.
+ * @rows: Rows in the current terminal.
+ * @cols: Columns in the current terminal.
  * @history_size: Size in byte of the history buffer.
  * @history_depth: Number of history entries browsed back.
  * @history_avail: Number of available bytes in history.
@@ -319,6 +321,8 @@ struct slash {
 	size_t change_end;
 	bool refresh_full;
 	char last_char;
+	size_t rows;
+	size_t cols;
 
 	/* History */
 	size_t history_size;

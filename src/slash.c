@@ -1138,6 +1138,79 @@ void slash_set_prompt(struct slash *slash, const char *prompt)
 	slash->prompt_length = strlen(prompt);
 }
 
+static int slash_screen_cursor_position_get(struct slash *slash, size_t *row, size_t *col)
+{
+	size_t i;
+	char c, cols_str[5] = "", rows_str[5] = "";
+
+	/* Use DSR to request current cursor position */
+	slash_printf(slash, ESCAPE("6n"));
+
+	/* Parse CPR ESC[n;mR */
+	c = slash_getchar(slash);
+	if (c != ESC)
+		return -EIO;
+
+	c = slash_getchar(slash);
+	if (c != '[')
+		return -EIO;
+
+	for (i = 0; i < sizeof(rows_str) - 1; i++) {
+		c = slash_getchar(slash);
+		if (!isdigit(c)) {
+			if (c != ';')
+				return -EIO;
+			break;
+		}
+		rows_str[i] = c;
+		rows_str[i + 1] = '\0';
+	}
+
+	for (i = 0; i < sizeof(cols_str) - 1; i++) {
+		c = slash_getchar(slash);
+		if (!isdigit(c)) {
+			if (c != 'R')
+				return -EIO;
+			break;
+		}
+		cols_str[i] = c;
+		cols_str[i + 1] = '\0';
+	}
+
+	*row = atoi(rows_str);
+	*col = atoi(cols_str);
+
+	return 0;
+}
+
+static int slash_screen_cursor_position_set(struct slash *slash, size_t row, size_t col)
+{
+	/* Use CUP to move cursor */
+	slash_printf(slash, ESCAPE("%zu;%zuH"), row, col);
+
+	return 0;
+}
+
+
+static void slash_resized(struct slash *slash)
+{
+	size_t row, col;
+
+	if (slash_screen_cursor_position_get(slash, &row, &col) < 0)
+		return;
+
+	if (slash_screen_cursor_position_set(slash, 9999, 9999) < 0)
+		return;
+
+	if (slash_screen_cursor_position_get(slash, &slash->rows, &slash->cols) < 0)
+		return;
+
+	if (slash_screen_cursor_position_set(slash, row, col) < 0)
+		return;
+
+	return;
+}
+
 char *slash_readline(struct slash *slash)
 {
 	char *ret = slash->buffer;
@@ -1145,6 +1218,7 @@ char *slash_readline(struct slash *slash)
 	bool done = false, escaped = false;
 
 	/* Reset buffer */
+	slash_resized(slash);
 	slash_reset(slash);
 	slash_refresh(slash);
 
