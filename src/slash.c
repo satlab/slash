@@ -1321,10 +1321,13 @@ static int slash_builtin_echo(struct slash *slash)
 {
 	int i;
 
-	for (i = 1; i < slash->argc; i++)
-		printf("%s ", slash->argv[i]);
+	for (i = 1; i < slash->argc; i++) {
+		slash_printf(slash, "%s", slash->argv[i]);
+		if (i + 1 < slash->argc)
+			slash_printf(slash, " ");
+	}
 
-	printf("\n");
+	slash_printf(slash, "\n");
 
 	return SLASH_SUCCESS;
 }
