@@ -1021,7 +1021,8 @@ int slash_refresh(struct slash *slash)
 
 static void slash_insert(struct slash *slash, int c)
 {
-	if (slash->length >= slash->line_size)
+	/* We need 1 extra byte for the zero termination */
+	if (slash->length + 1 >= slash->line_size)
 		return;
 
 	memmove(&slash->buffer[slash->cursor + 1],
