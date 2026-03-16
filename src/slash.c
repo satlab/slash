@@ -64,7 +64,7 @@ int slash_getopt(struct slash *slash, const char *opts)
 {
 	/* From "public domain AT&T getopt source" newsgroup posting */
 	int c;
-	char *cp;
+	const char *cp;
 
 	if (slash->sp == 1) {
 		if (slash->optind >= slash->argc ||
@@ -471,8 +471,7 @@ static void slash_command_usage(struct slash *slash, struct slash_command *comma
 
 static void slash_command_description(struct slash *slash, struct slash_command *command)
 {
-	char *nl;
-	const char *help = "";
+	const char *nl, *help = "";
 	size_t desclen = 0;
 
 	/* Extract first line from help as description */
