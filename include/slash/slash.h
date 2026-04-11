@@ -31,6 +31,10 @@
 #include <termios.h>
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Configuration */
 #define SLASH_SHOW_MAX		25	/* Maximum number of commands to list */
 #define SLASH_ARG_MAX		16	/* Maximum number of arguments, including command name */
@@ -46,12 +50,12 @@
 	__attribute__((section(".slash." # _ident), used, aligned(sizeof(long)))) \
 	struct slash_command _ident = { \
 		.name  = #_name, \
-		.parent = _group, \
 		.func  = _func, \
 		.args  = _args, \
 		.help  = _help, \
 		.flags = _flags, \
 		.context = _context, \
+		.parent = _group, \
 	}
 
 /* Top-level commands */
@@ -511,5 +515,9 @@ void slash_inhibit_exit(struct slash *slash, bool inhibit);
  * @activate: Set to true to allow privileged commands.
  */
 void slash_set_privileged(struct slash *slash, bool privileged);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif /* _SLASH_H_ */
