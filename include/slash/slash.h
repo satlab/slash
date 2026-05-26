@@ -235,6 +235,11 @@ typedef int (*slash_waitfunc_t)(struct slash *slash, unsigned int ms);
 #define SLASH_ENOENT	(-6)
 #define SLASH_EHELP	(-7)
 
+/* Incremental input return values */
+#define SLASH_INPUT_PENDING	(0)
+#define SLASH_INPUT_LINE	(1)
+#define SLASH_INPUT_EXIT	(2)
+
 /**
  * struct slash_command - Command description.
  * @name: Name of the command.
@@ -257,6 +262,21 @@ struct slash_command {
 	unsigned int flags;
 	void *context;
 	struct slash_command *parent;
+};
+
+/**
+ * struct slash_input_state - Incremental line input state.
+ * @escaped: True while decoding bytes received after ESC.
+ * @escape_length: Number of bytes stored in @escape.
+ * @escape: Pending bytes received after ESC while decoding control sequences.
+ *
+ * This state is owned by the caller. Reset it with slash_input_begin() before
+ * feeding bytes for a new line.
+ */
+struct slash_input_state {
+	bool escaped;
+	unsigned int escape_length;
+	int escape[3];
 };
 
 /**
@@ -407,6 +427,34 @@ void slash_reset(struct slash *slash);
  * @prompt: Prompt to print before command line.
  */
 void slash_set_prompt(struct slash *slash, const char *prompt);
+
+/**
+ * slash_input_begin() - Start incremental input for a new line.
+ * @slash: slash context.
+ * @state: Caller-owned incremental input state.
+ *
+ * This resets the current line buffer, refreshes the prompt, and clears the
+ * incremental input state. The same @state must then be reused for each
+ * subsequent slash_input_byte() call until a line is completed or the console
+ * exits.
+ */
+void slash_input_begin(struct slash *slash, struct slash_input_state *state);
+
+/**
+ * slash_input_byte() - Feed one byte into the line editor.
+ * @slash: slash context.
+ * @state: State previously initialized with slash_input_begin().
+ * @c: Next input byte.
+ * @line: Output line pointer. Set to slash->buffer when a line completes.
+ *
+ * Return: SLASH_INPUT_PENDING while the line is still being edited,
+ * SLASH_INPUT_LINE when a complete line is available in @line, or
+ * SLASH_INPUT_EXIT when the user requested EOF on an empty line.
+ */
+int slash_input_byte(struct slash *slash,
+		     struct slash_input_state *state,
+		     int c,
+		     char **line);
 
 /**
  * slash_readline() - Read line from user.

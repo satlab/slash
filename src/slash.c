@@ -198,6 +198,20 @@ static int slash_getchar(struct slash *slash)
 	return c;
 }
 
+static void slash_history_add(struct slash *slash, char *line);
+
+static int slash_finish_input(struct slash *slash, char *ret, char **line)
+{
+	slash_putchar(slash, '\n');
+	slash_history_add(slash, slash->buffer);
+	*line = ret;
+
+	if (ret == NULL)
+		return SLASH_INPUT_EXIT;
+
+	return SLASH_INPUT_LINE;
+}
+
 static void slash_mark_changed(struct slash *slash, size_t start, size_t end)
 {
 	if (slash->change_start == slash->change_end) {
@@ -593,26 +607,6 @@ static char *slash_last_word(char *line, size_t len, size_t *lastlen)
 	return word;
 }
 
-static bool slash_complete_confirm(struct slash *slash, int matches)
-{
-	char c = 'y';
-
-	if (matches <= SLASH_SHOW_MAX)
-		return true;
-
-	slash_printf(slash, "Display all %d possibilities? (y or n) ", matches);
-	do {
-		if (c != 'y')
-			slash_bell(slash);
-		c = slash_getchar(slash);
-	} while (c != 'y' && c != 'n' && c != '\t' &&
-		(isprint((int)c) || isspace((int)c)));
-
-	slash_printf(slash, "\n");
-
-	return (c == 'y' || c == '\t');
-}
-
 static int slash_prefix_length(const char *s1, const char *s2)
 {
 	int len = 0;
@@ -707,15 +701,13 @@ static void slash_complete(struct slash *slash)
 		slash_bell(slash);
 	} else {
 		slash_printf(slash, "\n");
-		if (slash_complete_confirm(slash, matches)) {
-			/* List matches */
-			slash_command_list_for_each(cur) {
-				if (!slash_complete_matches(slash, command, cur,
-							    complete, completelen))
-					continue;
+		/* Non-blocking callers cannot stop here to wait for confirmation. */
+		slash_command_list_for_each(cur) {
+			if (!slash_complete_matches(slash, command, cur,
+						    complete, completelen))
+				continue;
 
-				slash_command_description(slash, cur);
-			}
+			slash_command_description(slash, cur);
 		}
 		slash->refresh_full = true;
 	}
@@ -1138,131 +1130,183 @@ void slash_set_prompt(struct slash *slash, const char *prompt)
 	slash->prompt_length = strlen(prompt);
 }
 
-char *slash_readline(struct slash *slash)
+void slash_input_begin(struct slash *slash, struct slash_input_state *state)
 {
-	char *ret = slash->buffer;
-	int c, esc[3];
-	bool done = false, escaped = false;
+	memset(state, 0, sizeof(*state));
 
 	/* Reset buffer */
 	slash_reset(slash);
 	slash_refresh(slash);
+}
 
-	while (!done && ((c = slash_getchar(slash)) >= 0)) {
-		if (escaped) {
-			esc[0] = c;
-			esc[1] = slash_getchar(slash);
+/*
+ * Keep escape decoding in one place. Incremental input and blocking readline
+ * share this exact parser so the byte-by-byte path does not drift.
+ */
+static void slash_handle_escape_sequence(struct slash *slash,
+					 struct slash_input_state *state,
+					 int c)
+{
+	state->escape[state->escape_length++] = c;
 
-			if (esc[0] == '[' && esc[1] == 'A') {
-				slash_arrow_up(slash);
-			} else if (esc[0] == '[' && esc[1] == 'B') {
-				slash_arrow_down(slash);
-			} else if (esc[0] == '[' && esc[1] == 'C') {
-				slash_arrow_right(slash);
-			} else if (esc[0] == '[' && esc[1] == 'D') {
-				slash_arrow_left(slash);
-			} else if (esc[0] == '[' && (esc[1] > '0' &&
-						     esc[1] < '7')) {
-				esc[2] = slash_getchar(slash);
-				if (esc[1] == '3' && esc[2] == '~')
-					slash_delete(slash);
-			} else if (esc[0] == 'O' && esc[1] == 'H') {
-				slash->cursor = 0;
-			} else if (esc[0] == 'O' && esc[1] == 'F') {
-				slash->cursor = slash->length;
-			} else if (esc[0] == '1' && esc[1] == '~') {
-				slash->cursor = 0;
-			} else if (esc[0] == '4' && esc[1] == '[') {
-				esc[2] = slash_getchar(slash);
-				if (esc[2] == '~')
-					slash->cursor = slash->length;
-			}
-			escaped = false;
-		} else if (iscntrl(c)) {
-			switch (c) {
-			case CONTROL('A'):
-				slash->cursor = 0;
-				break;
-			case CONTROL('B'):
-				slash_arrow_left(slash);
-				break;
-			case CONTROL('C'):
-				slash_reset(slash);
-				done = true;
-				break;
-			case CONTROL('D'):
-				if (slash->length > 0) {
-					slash_delete(slash);
-				} else {
-#ifndef SLASH_NO_EXIT
-					if (!slash->exit_inhibit)
-						ret = NULL;
-#endif
-					done = true;
-				}
-				break;
-			case CONTROL('E'):
-				slash->cursor = slash->length;
-				break;
-			case CONTROL('F'):
-				slash_arrow_right(slash);
-				break;
-			case CONTROL('K'):
-				slash->length = slash->cursor;
-				slash->buffer[slash->length] = '\0';
-				break;
-			case CONTROL('L'):
-				slash_clear_screen(slash);
-				break;
-			case CONTROL('N'):
-				slash_arrow_down(slash);
-				break;
-			case CONTROL('P'):
-				slash_arrow_up(slash);
-				break;
-			case CONTROL('T'):
-				slash_swap(slash);
-				break;
-			case CONTROL('U'):
-				slash->cursor = 0;
-				slash->length = 0;
-				slash->buffer[0] = '\0';
-				break;
-			case CONTROL('W'):
-				slash_delete_word(slash);
-				break;
-			case '\t':
-				slash_complete(slash);
-				break;
-			case '\r':
-			case '\n':
-				done = true;
-				break;
-			case '\b':
-			case DEL:
-				slash_backspace(slash);
-				break;
-			case ESC:
-				escaped = true;
-				break;
-			default:
-				/* Unknown control */
-				break;
-			}
-		} else if (isprint(c)) {
-			/* Add to buffer */
-			slash_insert(slash, c);
+	if (state->escape_length == 1)
+		return;
+
+	if (state->escape_length == 2) {
+		if (state->escape[0] == '[' && state->escape[1] == 'A') {
+			slash_arrow_up(slash);
+		} else if (state->escape[0] == '[' && state->escape[1] == 'B') {
+			slash_arrow_down(slash);
+		} else if (state->escape[0] == '[' && state->escape[1] == 'C') {
+			slash_arrow_right(slash);
+		} else if (state->escape[0] == '[' && state->escape[1] == 'D') {
+			slash_arrow_left(slash);
+		} else if (state->escape[0] == 'O' && state->escape[1] == 'H') {
+			slash->cursor = 0;
+		} else if (state->escape[0] == 'O' && state->escape[1] == 'F') {
+			slash->cursor = slash->length;
+		} else if (state->escape[0] == '1' && state->escape[1] == '~') {
+			slash->cursor = 0;
+		} else if (state->escape[0] == '[' &&
+			   (state->escape[1] > '0' && state->escape[1] < '7')) {
+			return;
+		} else if (state->escape[0] == '4' && state->escape[1] == '[') {
+			return;
 		}
 
-		slash_refresh(slash);
-
-		slash->last_char = c;
+		state->escaped = false;
+		state->escape_length = 0;
+		return;
 	}
 
-	slash_putchar(slash, '\n');
-	slash_history_add(slash, slash->buffer);
+	if (state->escape[0] == '[' &&
+	    state->escape[1] == '3' &&
+	    state->escape[2] == '~') {
+		slash_delete(slash);
+	} else if (state->escape[0] == '4' &&
+		   state->escape[1] == '[' &&
+		   state->escape[2] == '~') {
+		slash->cursor = slash->length;
+	}
 
-	return ret;
+	state->escaped = false;
+	state->escape_length = 0;
+}
+
+int slash_input_byte(struct slash *slash,
+		     struct slash_input_state *state,
+		     int c,
+		     char **line)
+{
+	char *ret = slash->buffer;
+	bool done = false;
+
+	*line = NULL;
+
+	if (state->escaped) {
+		slash_handle_escape_sequence(slash, state, c);
+	} else if (iscntrl(c)) {
+		switch (c) {
+		case CONTROL('A'):
+			slash->cursor = 0;
+			break;
+		case CONTROL('B'):
+			slash_arrow_left(slash);
+			break;
+		case CONTROL('C'):
+			slash_reset(slash);
+			done = true;
+			break;
+		case CONTROL('D'):
+			if (slash->length > 0) {
+				slash_delete(slash);
+			} else {
+#ifndef SLASH_NO_EXIT
+				if (!slash->exit_inhibit)
+					ret = NULL;
+#endif
+				done = true;
+			}
+			break;
+		case CONTROL('E'):
+			slash->cursor = slash->length;
+			break;
+		case CONTROL('F'):
+			slash_arrow_right(slash);
+			break;
+		case CONTROL('K'):
+			slash->length = slash->cursor;
+			slash->buffer[slash->length] = '\0';
+			break;
+		case CONTROL('L'):
+			slash_clear_screen(slash);
+			break;
+		case CONTROL('N'):
+			slash_arrow_down(slash);
+			break;
+		case CONTROL('P'):
+			slash_arrow_up(slash);
+			break;
+		case CONTROL('T'):
+			slash_swap(slash);
+			break;
+		case CONTROL('U'):
+			slash->cursor = 0;
+			slash->length = 0;
+			slash->buffer[0] = '\0';
+			break;
+		case CONTROL('W'):
+			slash_delete_word(slash);
+			break;
+		case '\t':
+			slash_complete(slash);
+			break;
+		case '\r':
+		case '\n':
+			done = true;
+			break;
+		case '\b':
+		case DEL:
+			slash_backspace(slash);
+			break;
+		case ESC:
+			state->escaped = true;
+			state->escape_length = 0;
+			break;
+		default:
+			/* Unknown control */
+			break;
+		}
+	} else if (isprint(c)) {
+		/* Add to buffer */
+		slash_insert(slash, c);
+	}
+
+	slash_refresh(slash);
+	slash->last_char = c;
+
+	if (!done)
+		return SLASH_INPUT_PENDING;
+
+	return slash_finish_input(slash, ret, line);
+}
+
+char *slash_readline(struct slash *slash)
+{
+	struct slash_input_state state;
+	char *line = NULL;
+	int c;
+
+	slash_input_begin(slash, &state);
+
+	while ((c = slash_getchar(slash)) >= 0) {
+		const int ret = slash_input_byte(slash, &state, c, &line);
+		if (ret == SLASH_INPUT_LINE || ret == SLASH_INPUT_EXIT)
+			return line;
+	}
+
+	slash_finish_input(slash, slash->buffer, &line);
+	return line;
 }
 
 /* Builtin commands */
